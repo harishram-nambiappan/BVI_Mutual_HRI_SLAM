@@ -25,6 +25,12 @@
         android:theme="@style/Theme.SLAM_HRI_Mobile_Application"
         tools:targetApi="31">
         <activity
+            android:name=".ImageReview"
+            android:exported="false" />
+        <activity
+            android:name=".CamImg"
+            android:exported="false" />
+        <activity
             android:name=".SpeechConfirm"
             android:exported="false" />
         <activity
