@@ -10,6 +10,7 @@ if (envFile.exists()) {
     envFile.withInputStream { envProps.load(it) }
 }
 def openAiKey = envProps.getProperty("OPENAI_API_KEY", "")
+def serverUrl = envProps.getProperty("SERVER_URL", "")
 
 android {
     namespace 'com.example.slam_hri_mobile_application'
@@ -25,6 +26,7 @@ android {
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField "String", "OPENAI_API_KEY", "\"${openAiKey}\""
+        buildConfigField "String", "SERVER_URL", "\"${serverUrl}\""
     }
 
     buildFeatures {

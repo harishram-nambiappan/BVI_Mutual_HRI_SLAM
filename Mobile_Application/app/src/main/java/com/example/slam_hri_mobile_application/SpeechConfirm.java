@@ -12,6 +12,7 @@ import android.view.View;
 import android.view.animation.AccelerateDecelerateInterpolator;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.progressindicator.CircularProgressIndicator;
@@ -96,8 +97,7 @@ public class SpeechConfirm extends AppCompatActivity {
         send_speech.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                Intent menu_intent = new Intent(getApplicationContext(), Menu.class);
-                startActivity(menu_intent);
+                sendToServer();
             }
         });
 
@@ -109,6 +109,37 @@ public class SpeechConfirm extends AppCompatActivity {
             }
         });
 
+    }
+
+    private void sendToServer() {
+        Toast.makeText(getApplicationContext(), R.string.sending, Toast.LENGTH_SHORT).show();
+        send_speech.setEnabled(false);
+
+        ServerUploader.upload(audioFile, lastTranscript, new ServerUploader.UploadCallback() {
+            @Override
+            public void onSuccess() {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Toast.makeText(getApplicationContext(), R.string.sent_ok, Toast.LENGTH_SHORT).show();
+                        Intent menu_intent = new Intent(getApplicationContext(), Menu.class);
+                        startActivity(menu_intent);
+                    }
+                });
+            }
+
+            @Override
+            public void onError(final String message) {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        send_speech.setEnabled(true);
+                        int msg = "NO_URL".equals(message) ? R.string.send_no_url : R.string.send_failed;
+                        Toast.makeText(getApplicationContext(), msg, Toast.LENGTH_LONG).show();
+                    }
+                });
+            }
+        });
     }
 
     private void startTranscription() {
