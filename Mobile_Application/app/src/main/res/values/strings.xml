@@ -34,6 +34,8 @@
     <string name="cam_title">Take image</string>
     <string name="cam_subtitle">Center the subject, then capture</string>
     <string name="capture">Capture</string>
+    <string name="cd_flip_camera">Flip camera</string>
+    <string name="cam_unavailable">Other camera not available</string>
 
     <!-- Review -->
     <string name="review_title">Review image</string>

@@ -3,6 +3,7 @@ package com.example.slam_hri_mobile_application;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.camera.core.Camera;
+import androidx.camera.core.CameraInfoUnavailableException;
 import androidx.camera.core.CameraSelector;
 import androidx.camera.core.ImageCapture;
 import androidx.camera.core.ImageCaptureException;
@@ -23,12 +24,14 @@ import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.common.util.concurrent.ListenableFuture;
 
 public class CamImg extends AppCompatActivity {
 
     TextView take_image, add_speech, back;
     PreviewView pv;
+    FloatingActionButton flip_camera;
     ListenableFuture<ProcessCameraProvider> cpf;
 
     ProcessCameraProvider pcp;
@@ -45,6 +48,8 @@ public class CamImg extends AppCompatActivity {
 
     ContentValues cv;
 
+    int lensFacing = CameraSelector.LENS_FACING_FRONT;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -58,6 +63,8 @@ public class CamImg extends AppCompatActivity {
 
         back = (TextView) findViewById(R.id.textView16);
 
+        flip_camera = (FloatingActionButton) findViewById(R.id.flipCamera);
+
         if(ContextCompat.checkSelfPermission(getApplicationContext(), android.Manifest.permission.CAMERA)
                 != PackageManager.PERMISSION_GRANTED){
             requestPermissions(new String[]{Manifest.permission.CAMERA}, 1);
@@ -67,17 +74,21 @@ public class CamImg extends AppCompatActivity {
 
         try{
             pcp = cpf.get();
-            preview = new Preview.Builder().build();
-            cs = new CameraSelector.Builder().requireLensFacing(CameraSelector.LENS_FACING_FRONT).build();
-            preview.setSurfaceProvider(pv.getSurfaceProvider());
-
-            ic = new ImageCapture.Builder().build();
-
-            camera = pcp.bindToLifecycle((LifecycleOwner)this, cs, preview, ic);
+            bindCamera();
         }
         catch(Exception e){
             e.printStackTrace();
         }
+
+        flip_camera.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                lensFacing = (lensFacing == CameraSelector.LENS_FACING_FRONT)
+                        ? CameraSelector.LENS_FACING_BACK
+                        : CameraSelector.LENS_FACING_FRONT;
+                bindCamera();
+            }
+        });
 
         cv = new ContentValues();
 
@@ -119,5 +130,39 @@ public class CamImg extends AppCompatActivity {
             }
         });
 
+    }
+
+    private void bindCamera() {
+        if (pcp == null) {
+            return;
+        }
+
+        CameraSelector requested = new CameraSelector.Builder().requireLensFacing(lensFacing).build();
+
+        try {
+            if (!pcp.hasCamera(requested)) {
+                Toast.makeText(getApplicationContext(), R.string.cam_unavailable, Toast.LENGTH_SHORT).show();
+                lensFacing = (lensFacing == CameraSelector.LENS_FACING_FRONT)
+                        ? CameraSelector.LENS_FACING_BACK
+                        : CameraSelector.LENS_FACING_FRONT;
+                return;
+            }
+        } catch (CameraInfoUnavailableException e) {
+            e.printStackTrace();
+        }
+
+        try {
+            pcp.unbindAll();
+
+            preview = new Preview.Builder().build();
+            preview.setSurfaceProvider(pv.getSurfaceProvider());
+
+            cs = requested;
+            ic = new ImageCapture.Builder().build();
+
+            camera = pcp.bindToLifecycle((LifecycleOwner) this, cs, preview, ic);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }
