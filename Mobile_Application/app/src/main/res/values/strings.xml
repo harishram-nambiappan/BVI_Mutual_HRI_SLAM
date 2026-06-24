@@ -29,6 +29,12 @@
     <string name="play_recording">Play recording</string>
     <string name="send_request">Send request</string>
     <string name="rerecord">Re-record</string>
+    <string name="transcript_header">Transcript</string>
+    <string name="transcribing">Transcribing\u2026</string>
+    <string name="transcript_error">Couldn\'t transcribe the audio. Tap to retry.</string>
+    <string name="transcript_no_key">Add your OpenAI key to the .env file to enable transcription.</string>
+    <string name="transcript_no_recording">No recording found.</string>
+    <string name="transcript_empty">No speech detected.</string>
 
     <!-- Camera -->
     <string name="cam_title">Take image</string>

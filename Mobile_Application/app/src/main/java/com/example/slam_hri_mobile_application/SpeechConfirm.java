@@ -13,6 +13,10 @@ import android.view.animation.AccelerateDecelerateInterpolator;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import com.google.android.material.card.MaterialCardView;
+import com.google.android.material.progressindicator.CircularProgressIndicator;
+
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -26,6 +30,14 @@ public class SpeechConfirm extends AppCompatActivity {
 
     View playRing1, playRing2;
     final List<Animator> animators = new ArrayList<>();
+
+    // Transcription
+    MaterialCardView transcriptCard;
+    TextView transcriptText;
+    CircularProgressIndicator transcriptProgress;
+    String lastTranscript = "";
+
+    File audioFile;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -43,12 +55,28 @@ public class SpeechConfirm extends AppCompatActivity {
         playRing1 = findViewById(R.id.playRing1);
         playRing2 = findViewById(R.id.playRing2);
 
+        transcriptCard = (MaterialCardView) findViewById(R.id.transcriptCard);
+        transcriptText = (TextView) findViewById(R.id.transcriptText);
+        transcriptProgress = (CircularProgressIndicator) findViewById(R.id.transcriptProgress);
+
+        audioFile = new File(getFilesDir(), "slam_hri_request_sample_1.mp4");
+
+        // Retry transcription by tapping the card.
+        transcriptCard.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                startTranscription();
+            }
+        });
+
+        startTranscription();
+
         play_record.setOnClickListener(new View.OnClickListener(){
             @Override
             public void onClick(View view) {
                 mp = new MediaPlayer();
                 try {
-                    mp.setDataSource(getFilesDir() + "/slam_hri_request_sample_1.mp4");
+                    mp.setDataSource(audioFile.getAbsolutePath());
                     mp.prepare();
                     mp.start();
                     startPlaybackUi();
@@ -81,6 +109,48 @@ public class SpeechConfirm extends AppCompatActivity {
             }
         });
 
+    }
+
+    private void startTranscription() {
+        transcriptProgress.setVisibility(View.VISIBLE);
+        transcriptText.setText(R.string.transcribing);
+
+        OpenAiClient.transcribe(audioFile, new OpenAiClient.TranscriptionCallback() {
+            @Override
+            public void onResult(final String transcript) {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        transcriptProgress.setVisibility(View.GONE);
+                        if (transcript == null || transcript.isEmpty()) {
+                            lastTranscript = "";
+                            transcriptText.setText(R.string.transcript_empty);
+                        } else {
+                            lastTranscript = transcript;
+                            transcriptText.setText(transcript);
+                        }
+                    }
+                });
+            }
+
+            @Override
+            public void onError(final String message) {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        transcriptProgress.setVisibility(View.GONE);
+                        lastTranscript = "";
+                        if ("NO_KEY".equals(message)) {
+                            transcriptText.setText(R.string.transcript_no_key);
+                        } else if ("NO_FILE".equals(message)) {
+                            transcriptText.setText(R.string.transcript_no_recording);
+                        } else {
+                            transcriptText.setText(R.string.transcript_error);
+                        }
+                    }
+                });
+            }
+        });
     }
 
     private void startPlaybackUi() {
