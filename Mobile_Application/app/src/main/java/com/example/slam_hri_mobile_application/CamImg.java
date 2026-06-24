@@ -14,18 +14,17 @@ import androidx.core.content.ContextCompat;
 import androidx.lifecycle.LifecycleOwner;
 
 import android.Manifest;
-import android.content.ContentValues;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.os.Build;
 import android.os.Bundle;
-import android.provider.MediaStore;
 import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.common.util.concurrent.ListenableFuture;
+
+import java.io.File;
 
 public class CamImg extends AppCompatActivity {
 
@@ -43,10 +42,6 @@ public class CamImg extends AppCompatActivity {
     Camera camera;
 
     ImageCapture ic;
-
-    ImageCapture.OutputFileOptions ofo;
-
-    ContentValues cv;
 
     int lensFacing = CameraSelector.LENS_FACING_FRONT;
 
@@ -90,32 +85,36 @@ public class CamImg extends AppCompatActivity {
             }
         });
 
-        cv = new ContentValues();
-
         take_image.setOnClickListener(new View.OnClickListener(){
             @Override
             public void onClick(View view) {
-                cv.put(MediaStore.MediaColumns.DISPLAY_NAME, "extra_img_1.jpg");
-                cv.put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg");
-                if(Build.VERSION.SDK_INT > Build.VERSION_CODES.P) {
-                    cv.put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/CameraX-Image");
+                if (ic == null) {
+                    return;
                 }
 
-                ofo = new ImageCapture.OutputFileOptions.Builder(getContentResolver(), MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                        cv).build();
+                // Always write to the same file and overwrite it, so the review
+                // screen shows the photo that was just captured (not a stale one).
+                final File photoFile = new File(getFilesDir(), "captured_image.jpg");
+                if (photoFile.exists()) {
+                    photoFile.delete();
+                }
+
+                ImageCapture.OutputFileOptions ofo =
+                        new ImageCapture.OutputFileOptions.Builder(photoFile).build();
+
                 ic.takePicture(ofo, ContextCompat.getMainExecutor(getApplicationContext()), new ImageCapture.OnImageSavedCallback() {
                     @Override
                     public void onImageSaved(@NonNull ImageCapture.OutputFileResults outputFileResults) {
-                        Toast saved_toast = Toast.makeText(getApplicationContext(), "Image Captured", Toast.LENGTH_SHORT);
-                        saved_toast.show();
+                        Toast.makeText(getApplicationContext(), R.string.image_captured, Toast.LENGTH_SHORT).show();
                         Intent review_intent = new Intent(getApplicationContext(), ImageReview.class);
-                        review_intent.putExtra("image_path", "/storage/emulated/0/Pictures/CameraX-Image/extra_img_1.jpg");
+                        review_intent.putExtra("image_path", photoFile.getAbsolutePath());
                         startActivity(review_intent);
                     }
 
                     @Override
                     public void onError(@NonNull ImageCaptureException exception) {
-
+                        exception.printStackTrace();
+                        Toast.makeText(getApplicationContext(), R.string.capture_failed, Toast.LENGTH_SHORT).show();
                     }
                 });
 
