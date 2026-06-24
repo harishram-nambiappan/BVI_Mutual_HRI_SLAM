@@ -18,7 +18,10 @@ phone records audio
 
 ## Requirements
 
-- Python 3.9+ (Tkinter ships with standard CPython installers)
+- Python 3.9+ **with Tkinter (Tk)** support for the GUI. Anaconda and the
+  python.org installers include it; Homebrew's Python often does **not**
+  (`brew install python-tk` adds it). `auto_deploy.sh` auto-picks a Tk-capable
+  Python for you.
 - `pip install -r requirements.txt`
 - Audio playback:
   - macOS: uses the built-in `afplay` (no install)

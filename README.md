@@ -61,6 +61,7 @@ BVI_Mutual_HRI_SLAM/
 │
 └── Computer_Receiver/            # Python desktop receiver
     ├── receiver.py               # Flask HTTP server + Tkinter GUI (one process)
+    ├── receiver_icon.png         # app icon shown in the GUI window/header
     ├── auto_deploy.sh            # one-command setup + run (venv, install, start)
     ├── requirements.txt          # Flask
     ├── README.md                 # receiver-specific docs
@@ -307,6 +308,10 @@ reach the local `http://` receiver.
 * **Phone can't reach the computer** — confirm both are on the same Wi-Fi, that
   `SERVER_URL` matches the IP printed by `receiver.py`, and that your firewall
   allows incoming connections on port 8000 (macOS may prompt the first time).
+* **`ModuleNotFoundError: No module named '_tkinter'`** — your Python lacks Tk
+  support (common with Homebrew's Python). `auto_deploy.sh` auto-selects a
+  Tk-capable Python; if you run manually, use Anaconda/python.org Python, or on
+  macOS install Tk for Homebrew Python with `brew install python-tk`.
 * **`GET /` shows 404** — you're on an old server build; restart `receiver.py`
   (the status page route was added). `/upload` and `/health` always exist.
 * **Transcript empty on the desktop** — you likely tapped **Send** before

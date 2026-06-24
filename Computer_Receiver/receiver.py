@@ -123,13 +123,32 @@ class ReceiverGui:
         root.geometry("820x520")
         root.minsize(680, 420)
 
+        # App icon (kept as attributes so Tk doesn't garbage-collect them).
+        icon_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "receiver_icon.png"
+        )
+        self.icon_img = None
+        self.icon_small = None
+        if os.path.exists(icon_path):
+            try:
+                self.icon_img = tk.PhotoImage(file=icon_path)
+                root.iconphoto(True, self.icon_img)
+                # Smaller copy for the header (256px -> ~52px).
+                self.icon_small = self.icon_img.subsample(5, 5)
+            except Exception:
+                self.icon_img = None
+                self.icon_small = None
+
         url = f"http://{local_ip()}:{PORT}"
-        header = ttk.Label(
-            root,
+        header = ttk.Frame(root)
+        header.pack(side=tk.TOP, fill=tk.X, padx=12, pady=(12, 6))
+        if self.icon_small is not None:
+            ttk.Label(header, image=self.icon_small).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Label(
+            header,
             text=f"Listening on {url}   (set this as SERVER_URL on the phone)",
             font=("Helvetica", 12, "bold"),
-        )
-        header.pack(side=tk.TOP, fill=tk.X, padx=12, pady=(12, 6))
+        ).pack(side=tk.LEFT, anchor="w")
 
         body = ttk.Frame(root)
         body.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=12, pady=6)
