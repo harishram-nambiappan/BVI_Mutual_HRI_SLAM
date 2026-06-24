@@ -36,7 +36,9 @@ public class ServerUploader {
             .readTimeout(30, TimeUnit.SECONDS)
             .build();
 
-    public static void upload(final File audioFile, final String transcript, final UploadCallback cb) {
+    public static void upload(final File audioFile, final String transcript, final String mode,
+                              final File imageFile, final String description,
+                              final UploadCallback cb) {
         String base = BuildConfig.SERVER_URL;
         if (base == null || base.trim().isEmpty()) {
             cb.onError("NO_URL");
@@ -50,13 +52,21 @@ public class ServerUploader {
         base = base.trim();
         String url = base.endsWith("/") ? base + "upload" : base + "/upload";
 
-        RequestBody fileBody = RequestBody.create(MediaType.parse("audio/mp4"), audioFile);
+        RequestBody audioBody = RequestBody.create(MediaType.parse("audio/mp4"), audioFile);
 
-        MultipartBody body = new MultipartBody.Builder()
+        MultipartBody.Builder builder = new MultipartBody.Builder()
                 .setType(MultipartBody.FORM)
-                .addFormDataPart("audio", audioFile.getName(), fileBody)
+                .addFormDataPart("audio", audioFile.getName(), audioBody)
                 .addFormDataPart("transcript", transcript != null ? transcript : "")
-                .build();
+                .addFormDataPart("mode", mode != null ? mode : "")
+                .addFormDataPart("description", description != null ? description : "");
+
+        if (imageFile != null && imageFile.exists() && imageFile.length() > 0) {
+            RequestBody imageBody = RequestBody.create(MediaType.parse("image/jpeg"), imageFile);
+            builder.addFormDataPart("image", imageFile.getName(), imageBody);
+        }
+
+        MultipartBody body = builder.build();
 
         Request request = new Request.Builder()
                 .url(url)

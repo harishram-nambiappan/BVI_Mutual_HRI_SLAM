@@ -124,7 +124,10 @@ public class SpeechConfirm extends AppCompatActivity {
         Toast.makeText(getApplicationContext(), R.string.sending, Toast.LENGTH_SHORT).show();
         send_speech.setEnabled(false);
 
-        ServerUploader.upload(audioFile, lastTranscript, new ServerUploader.UploadCallback() {
+        String mode = (imageFile != null) ? "speech+image" : "speech";
+
+        ServerUploader.upload(audioFile, lastTranscript, mode, imageFile, lastDescription,
+                new ServerUploader.UploadCallback() {
             @Override
             public void onSuccess() {
                 runOnUiThread(new Runnable() {
