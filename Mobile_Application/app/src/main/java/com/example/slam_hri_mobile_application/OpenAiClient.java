@@ -31,7 +31,12 @@ public class OpenAiClient {
     }
 
     private static final String ENDPOINT = "https://api.openai.com/v1/audio/transcriptions";
-    private static final String MODEL = "gpt-4o-mini-transcribe";
+    private static final String DEFAULT_MODEL = "gpt-4o-mini-transcribe";
+
+    private static String model() {
+        String m = BuildConfig.TRANSCRIPTION_MODEL;
+        return (m == null || m.trim().isEmpty()) ? DEFAULT_MODEL : m.trim();
+    }
 
     private static final OkHttpClient client = new OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
@@ -59,7 +64,7 @@ public class OpenAiClient {
         MultipartBody body = new MultipartBody.Builder()
                 .setType(MultipartBody.FORM)
                 .addFormDataPart("file", audioFile.getName(), fileBody)
-                .addFormDataPart("model", MODEL)
+                .addFormDataPart("model", model())
                 .addFormDataPart("response_format", "json")
                 .build();
 

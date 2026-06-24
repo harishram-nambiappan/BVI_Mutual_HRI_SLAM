@@ -35,8 +35,9 @@ BVI_Mutual_HRI_SLAM/
 ├── README.md                      # this file
 │
 ├── Mobile_Application/            # Android app (Java, XML layouts)
-│   ├── .env                       # SECRETS (gitignored): OpenAI key + server URL
+│   ├── .env                       # SECRETS (gitignored, you create this): OpenAI key + server URL
 │   ├── .env.example               # template for .env (committed)
+│   ├── config.properties          # non-secret config (committed): transcription model
 │   ├── build.gradle               # root Gradle config (AGP 8.2.2)
 │   └── app/
 │       ├── build.gradle           # deps, SDK levels, reads .env -> BuildConfig
@@ -83,30 +84,61 @@ BVI_Mutual_HRI_SLAM/
 
 ---
 
-## Configuration — the `.env` file
+## Configuration
 
-Secrets and the server address are kept out of git in `Mobile_Application/.env`
-(gitignored). Copy the template and fill it in:
+There are **two** config files for the mobile app, by design:
+
+| File | Committed? | Holds | You edit it? |
+|------|-----------|-------|--------------|
+| `Mobile_Application/.env` | **No** (gitignored) | **Secrets**: OpenAI key + your computer's IP/URL | **Yes — you must create it** |
+| `Mobile_Application/config.properties` | Yes | **Non-secret config**: the transcription model | Only to change the model |
+
+Both are read by `app/build.gradle` at build time and exposed via `BuildConfig`.
+
+### 1. You MUST create the `.env` file
+
+The repo does **not** ship a `.env` (it's gitignored so secrets never get
+committed). Create it from the template before building:
 
 ```bash
 cd Mobile_Application
 cp .env.example .env
 ```
 
-`.env` keys:
+Then open `Mobile_Application/.env` and set both values:
+
+```properties
+# Your OpenAI API key (used by the phone to transcribe audio)
+OPENAI_API_KEY=sk-your-real-key-here
+
+# Your computer's LAN IP + the receiver port 8000 (no trailing /upload).
+# This must match the URL that receiver.py prints on startup.
+SERVER_URL=http://192.168.1.153:8000
+```
 
 | Key | What it is | Example |
 |-----|------------|---------|
-| `OPENAI_API_KEY` | Your OpenAI key, used by the phone to transcribe audio | `sk-...` |
-| `SERVER_URL` | The desktop receiver's address on your LAN (no trailing `/upload`) | `http://192.168.1.153:8000` |
+| `OPENAI_API_KEY` | OpenAI key, used by the phone for transcription | `sk-...` |
+| `SERVER_URL` | The desktop receiver's address on your LAN | `http://192.168.1.153:8000` |
 
-At build time, `app/build.gradle` reads `.env` and exposes these as
-`BuildConfig.OPENAI_API_KEY` and `BuildConfig.SERVER_URL`. Nothing secret is
-committed.
+Exposed as `BuildConfig.OPENAI_API_KEY` and `BuildConfig.SERVER_URL`.
 
-> Security note: in this configuration the OpenAI key is compiled into the APK,
-> which is fine for a private prototype but means you should not distribute the
-> built APK.
+> ⚠️ The phone and the computer **must be on the same Wi-Fi network** for the
+> upload to work. If your computer's IP changes, update `SERVER_URL` and rebuild.
+
+> 🔒 Security note: with this design the OpenAI key is compiled into the APK —
+> fine for a private prototype, but don't distribute the built APK.
+
+### 2. The transcription model lives in `config.properties`
+
+This is non-secret, so it's committed. Change it here to swap models:
+
+```properties
+# Examples: gpt-4o-mini-transcribe, gpt-4o-transcribe, whisper-1
+TRANSCRIPTION_MODEL=gpt-4o-mini-transcribe
+```
+
+Exposed as `BuildConfig.TRANSCRIPTION_MODEL` and used by `OpenAiClient`.
 
 ---
 
@@ -191,7 +223,7 @@ so new clips appear automatically.
 | Camera | CameraX (`androidx.camera:*`), front/back switching |
 | Audio | `android.media.MediaRecorder` / `MediaPlayer` |
 | Networking | OkHttp (`com.squareup.okhttp3:okhttp`) |
-| Transcription | OpenAI `gpt-4o-mini-transcribe` |
+| Transcription | OpenAI (`gpt-4o-mini-transcribe` by default; set in `config.properties`) |
 | Min / Target SDK | 24 / 34 |
 | Package | `com.example.slam_hri_mobile_application` |
 
