@@ -4,66 +4,83 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:padding="@dimen/screen_padding"
     tools:context=".SpeechConfirm">
 
     <TextView
         android:id="@+id/textView8"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="80dp"
-        android:text="CONFIRM SPEECH REQUEST"
-        android:textSize="24sp"
-        android:textStyle="bold|italic"
-        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="48dp"
+        android:text="@string/confirm_title"
+        android:textAppearance="@style/TextAppearance.App.Title"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <ImageView
-        android:id="@+id/imageView3"
-        android:layout_width="164dp"
-        android:layout_height="155dp"
-        android:layout_marginTop="52dp"
+    <TextView
+        android:id="@+id/confirmSubtitle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/space_s"
+        android:text="@string/confirm_subtitle"
+        android:textAppearance="@style/TextAppearance.App.Subtitle"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/textView8"
-        app:srcCompat="@drawable/play" />
+        app:layout_constraintTop_toBottomOf="@+id/textView8" />
+
+    <ImageView
+        android:id="@+id/imageView3"
+        android:layout_width="@dimen/icon_button_size"
+        android:layout_height="@dimen/icon_button_size"
+        android:background="@drawable/bg_icon_accent"
+        android:clickable="true"
+        android:contentDescription="@string/cd_play_recording"
+        android:focusable="true"
+        android:padding="@dimen/icon_button_padding"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_play"
+        app:tint="@color/white"
+        app:layout_constraintBottom_toTopOf="@+id/textView9"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/confirmSubtitle"
+        app:layout_constraintVertical_chainStyle="packed"
+        app:layout_constraintVertical_bias="0.42" />
 
     <TextView
         android:id="@+id/textView9"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="PLAY SPEECH COMMAND"
-        android:textSize="16sp"
-        android:textStyle="bold"
+        android:layout_marginTop="@dimen/space_m"
+        android:text="@string/play_recording"
+        android:textAppearance="@style/TextAppearance.App.Label"
+        app:layout_constraintBottom_toTopOf="@+id/textView10"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/imageView3" />
 
-    <TextView
+    <com.google.android.material.button.MaterialButton
         android:id="@+id/textView10"
-        android:layout_width="wrap_content"
+        style="@style/Widget.App.Button"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="64dp"
-        android:text="SEND SPEECH REQUEST"
-        android:textSize="16sp"
-        android:textStyle="bold"
+        android:layout_marginBottom="@dimen/space_m"
+        android:text="@string/send_request"
+        app:icon="@drawable/ic_send"
+        app:layout_constraintBottom_toTopOf="@+id/textView11"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/textView9" />
+        app:layout_constraintStart_toStartOf="parent" />
 
-    <TextView
+    <com.google.android.material.button.MaterialButton
         android:id="@+id/textView11"
-        android:layout_width="wrap_content"
+        style="@style/Widget.App.Button.Outlined"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="40dp"
-        android:text="BACK TO RECORD REQUEST"
-        android:textSize="16sp"
-        android:textStyle="bold"
+        android:layout_marginBottom="@dimen/space_s"
+        android:text="@string/rerecord"
+        app:icon="@drawable/ic_mic"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.538"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/textView10"
-        app:layout_constraintVertical_bias="0.004" />
+        app:layout_constraintStart_toStartOf="parent" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>

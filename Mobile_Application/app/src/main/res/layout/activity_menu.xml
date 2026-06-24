@@ -4,49 +4,56 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:padding="@dimen/screen_padding"
     tools:context=".Menu">
 
     <TextView
         android:id="@+id/textView2"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="52dp"
-        android:text="MENU"
-        android:textAlignment="center"
-        android:textSize="24sp"
-        android:textStyle="bold|italic"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.498"
+        android:layout_marginTop="48dp"
+        android:text="@string/menu_title"
+        android:textAppearance="@style/TextAppearance.App.Title"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
     <TextView
-        android:id="@+id/textView3"
-        android:layout_width="wrap_content"
+        android:id="@+id/menuSubtitle"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="80dp"
-        android:text="SEND SPEECH COMMANDS"
-        android:textSize="16sp"
-        android:textStyle="bold"
-        app:layout_constraintBottom_toTopOf="@+id/textView12"
+        android:layout_marginTop="@dimen/space_s"
+        android:text="@string/menu_subtitle"
+        android:textAppearance="@style/TextAppearance.App.Subtitle"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/textView2"
-        app:layout_constraintVertical_bias="0.047" />
+        app:layout_constraintTop_toBottomOf="@+id/textView2" />
 
-    <TextView
-        android:id="@+id/textView12"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="68dp"
-        android:text="SEND SPEECH COMMAND WITH IMAGE"
-        android:textSize="16sp"
-        android:textStyle="bold"
-        app:layout_constraintBottom_toBottomOf="parent"
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/textView3"
+        style="@style/Widget.App.Button"
+        android:layout_width="0dp"
+        android:layout_height="88dp"
+        android:layout_marginTop="40dp"
+        android:gravity="start|center_vertical"
+        android:text="@string/action_speech"
+        app:icon="@drawable/ic_mic"
+        app:iconSize="26dp"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.495"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/menuSubtitle" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/textView12"
+        style="@style/Widget.App.Button.Tonal"
+        android:layout_width="0dp"
+        android:layout_height="88dp"
+        android:layout_marginTop="@dimen/space_m"
+        android:gravity="start|center_vertical"
+        android:text="@string/action_speech_image"
+        app:icon="@drawable/ic_camera"
+        app:iconSize="26dp"
+        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/textView3" />
-
 
 </androidx.constraintlayout.widget.ConstraintLayout>

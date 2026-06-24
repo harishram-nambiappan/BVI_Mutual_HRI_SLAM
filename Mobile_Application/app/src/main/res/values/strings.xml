@@ -1,3 +1,47 @@
 <resources>
-    <string name="app_name">SLAM_HRI_Mobile_Application</string>
+    <string name="app_name">Mutual HRI</string>
+
+    <!-- Intro -->
+    <string name="intro_title">Mutual HRI</string>
+    <string name="intro_subtitle">Speech &amp; vision assistant for SLAM</string>
+    <string name="loading">Preparing…</string>
+
+    <!-- Menu -->
+    <string name="menu_title">Menu</string>
+    <string name="menu_subtitle">How would you like to communicate?</string>
+    <string name="action_speech">Speech command</string>
+    <string name="action_speech_image">Speech with image</string>
+
+    <!-- Record request -->
+    <string name="speech_title">Record request</string>
+    <string name="speech_subtitle">Tap the mic to start, stop when you\'re done</string>
+    <string name="start_recording">Start</string>
+    <string name="stop_recording">Stop</string>
+    <string name="back_to_menu">Back to menu</string>
+
+    <!-- Confirm -->
+    <string name="confirm_title">Confirm request</string>
+    <string name="confirm_subtitle">Listen to your recording before sending</string>
+    <string name="play_recording">Play recording</string>
+    <string name="send_request">Send request</string>
+    <string name="rerecord">Re-record</string>
+
+    <!-- Camera -->
+    <string name="cam_title">Take image</string>
+    <string name="cam_subtitle">Center the subject, then capture</string>
+    <string name="capture">Capture</string>
+
+    <!-- Review -->
+    <string name="review_title">Review image</string>
+    <string name="review_subtitle">Looks good? Add your speech command</string>
+    <string name="add_speech">Add speech</string>
+    <string name="retake">Retake</string>
+
+    <!-- Content descriptions -->
+    <string name="cd_logo">App logo</string>
+    <string name="cd_start_recording">Start recording</string>
+    <string name="cd_stop_recording">Stop recording</string>
+    <string name="cd_play_recording">Play recording</string>
+    <string name="cd_camera_preview">Camera preview</string>
+    <string name="cd_captured_image">Captured image preview</string>
 </resources>
