@@ -2,140 +2,282 @@
 
 A research prototype for **Mutual Human-Robot Interaction (HRI)** aimed at **Blind and Visually-Impaired (BVI)** users in a **SLAM** (Simultaneous Localization and Mapping) context.
 
-The repository currently contains an **Android mobile client** that lets a user send a **spoken command** to a robot, optionally paired with a **captured image**. The user records audio, reviews/plays it back, can attach a front-camera photo, and confirms the request.
+The system has two parts:
 
-> Status: early prototype. Audio and images are captured and stored **locally on the device**; the network/upload layer to the robot is not implemented yet (the permissions are already declared in anticipation of it).
+1. **`Mobile_Application/`** — an Android client. The user records a **spoken command**, optionally attaches a **camera photo**, the clip is **transcribed by OpenAI on the phone**, and the audio + transcript are **uploaded to a desktop receiver**.
+2. **`Computer_Receiver/`** — a small Python desktop app (HTTP server + GUI) that receives clips from the phone, lets you **read the transcript** and **play the audio**.
+
+---
+
+## End-to-end flow
+
+```
+[ Phone ]                                  [ Your computer ]
+
+record audio ──▶ transcribe via OpenAI ──▶ transcript shown on phone
+     │                                            │
+     │  POST audio + transcript                   │
+     └──────────────▶ http://<pc-ip>:8000/upload ─┴─▶ Python receiver
+                                                       ├─ HTTP server (Flask)
+                                                       └─ Desktop GUI (Tkinter):
+                                                          list clips · show
+                                                          transcript · play audio
+```
+
+The phone and computer must be on the **same Wi-Fi network**.
+
+---
+
+## Repository layout — where each thing lives
+
+```
+BVI_Mutual_HRI_SLAM/
+├── README.md                      # this file
+│
+├── Mobile_Application/            # Android app (Java, XML layouts)
+│   ├── .env                       # SECRETS (gitignored): OpenAI key + server URL
+│   ├── .env.example               # template for .env (committed)
+│   ├── build.gradle               # root Gradle config (AGP 8.2.2)
+│   └── app/
+│       ├── build.gradle           # deps, SDK levels, reads .env -> BuildConfig
+│       └── src/main/
+│           ├── AndroidManifest.xml
+│           ├── java/com/example/slam_hri_mobile_application/
+│           │   ├── Intro.java          # splash screen
+│           │   ├── Menu.java           # main menu
+│           │   ├── SpeechRequest.java  # record audio (+ recording animation)
+│           │   ├── SpeechConfirm.java  # play, transcribe, show transcript, upload
+│           │   ├── CamImg.java         # camera preview + capture + front/back flip
+│           │   ├── ImageReview.java    # review captured photo
+│           │   ├── OpenAiClient.java   # calls OpenAI transcription API
+│           │   └── ServerUploader.java # uploads audio + transcript to the PC
+│           └── res/
+│               ├── layout/        # one XML layout per screen
+│               ├── values/        # colors, dimens, strings, themes, styles
+│               ├── values-night/  # dark-theme color/theme overrides
+│               ├── drawable/      # vector icons + backgrounds
+│               └── mipmap-*/      # launcher icons
+│
+└── Computer_Receiver/            # Python desktop receiver
+    ├── receiver.py               # Flask HTTP server + Tkinter GUI (one process)
+    ├── requirements.txt          # Flask
+    ├── README.md                 # receiver-specific docs
+    ├── .gitignore                # ignores received/ and __pycache__
+    └── received/                 # (created at runtime) saved clips + transcripts
+```
 
 ---
 
 ## Requirements
 
-* Android Studio (with the Android SDK) and a JDK installed
-* An Android device or emulator running **Android 7.0 (API 24)** or higher
-* The device needs a **camera** and **microphone**
+**Mobile app**
+* Android Studio (with the Android SDK) and a JDK
+* An Android device or emulator on **Android 7.0 (API 24)** or higher
+* A **camera** and **microphone**
+* An **OpenAI API key** (for transcription)
+
+**Desktop receiver**
+* Python 3.9+ (Tkinter ships with standard CPython)
+* `pip install -r Computer_Receiver/requirements.txt` (installs Flask)
+* Audio playback: macOS uses built-in `afplay`; Windows opens the default player; Linux uses `ffplay` (install `ffmpeg`)
 
 ---
 
-## How to build & run
+## Configuration — the `.env` file
+
+Secrets and the server address are kept out of git in `Mobile_Application/.env`
+(gitignored). Copy the template and fill it in:
 
 ```bash
 cd Mobile_Application
-# point Gradle at your SDK (or create local.properties with sdk.dir=...)
-export ANDROID_HOME="$HOME/Library/Android/sdk"
+cp .env.example .env
+```
+
+`.env` keys:
+
+| Key | What it is | Example |
+|-----|------------|---------|
+| `OPENAI_API_KEY` | Your OpenAI key, used by the phone to transcribe audio | `sk-...` |
+| `SERVER_URL` | The desktop receiver's address on your LAN (no trailing `/upload`) | `http://192.168.1.153:8000` |
+
+At build time, `app/build.gradle` reads `.env` and exposes these as
+`BuildConfig.OPENAI_API_KEY` and `BuildConfig.SERVER_URL`. Nothing secret is
+committed.
+
+> Security note: in this configuration the OpenAI key is compiled into the APK,
+> which is fine for a private prototype but means you should not distribute the
+> built APK.
+
+---
+
+## Setup & run (full system)
+
+### 1. Start the desktop receiver
+
+```bash
+cd Computer_Receiver
+pip install -r requirements.txt
+python receiver.py
+```
+
+On start it prints (and shows in the GUI title bar) the URL it is listening on,
+e.g. `http://192.168.1.153:8000`. A **desktop window** opens — that is the GUI
+(it is a native window, not a web page, so it has no URL of its own).
+
+### 2. Point the phone at your computer
+
+In `Mobile_Application/.env` set `SERVER_URL` to your computer's LAN IP and port
+`8000`, and set your `OPENAI_API_KEY`.
+
+### 3. Build & run the app
+
+```bash
+cd Mobile_Application
+export ANDROID_HOME="$HOME/Library/Android/sdk"   # or set sdk.dir in local.properties
 ./gradlew assembleDebug          # build a debug APK
 ./gradlew installDebug           # build + install on a connected device/emulator
 ```
 
-Or simply open the `Mobile_Application/` folder in Android Studio and press **Run**.
+Or open `Mobile_Application/` in Android Studio and press **Run**. Launcher
+entry point: the `Intro` activity.
 
-The launcher entry point is the `Intro` activity.
+### 4. Use it
 
----
+Record a command → on the **Confirm request** screen the transcript appears →
+tap **Send request** → the clip + transcript show up in the desktop GUI, where
+you can press **Play**.
 
-## Project structure
-
-```
-BVI_Mutual_HRI_SLAM/
-├── README.md                     # this file
-└── Mobile_Application/           # Android app (Java, XML layouts)
-    ├── build.gradle              # root Gradle config (AGP 8.2.2)
-    ├── settings.gradle
-    └── app/
-        ├── build.gradle          # app module: deps, SDK levels
-        └── src/main/
-            ├── AndroidManifest.xml
-            ├── java/com/example/slam_hri_mobile_application/
-            │   ├── Intro.java
-            │   ├── Menu.java
-            │   ├── SpeechRequest.java
-            │   ├── SpeechConfirm.java
-            │   ├── CamImg.java
-            │   └── ImageReview.java
-            └── res/
-                ├── layout/        # one XML layout per screen
-                ├── values/        # colors, dimens, strings, themes, styles
-                ├── values-night/  # dark-theme color/theme overrides
-                ├── drawable/      # vector icons + backgrounds
-                └── mipmap-*/      # launcher icons
-```
+> Tip: send **after** the transcript appears on the phone. Tapping "Send" while
+> it still says "Transcribing…" uploads an empty transcript.
 
 ---
 
-## Tech stack
+## The desktop receiver (`Computer_Receiver/`)
+
+`receiver.py` runs **two things in one process**:
+
+**A) HTTP server (Flask)** — receives data from the phone. Endpoints:
+
+| URL | Method | Used by | Purpose |
+|-----|--------|---------|---------|
+| `http://<pc-ip>:8000/` | GET | you (browser) | "server is running ✅" status page |
+| `http://<pc-ip>:8000/health` | GET | you (browser) | JSON `{"status":"ok"}` |
+| `http://<pc-ip>:8000/upload` | POST | **the phone** | multipart `audio` file + `transcript` text |
+
+Uploads are saved to `Computer_Receiver/received/` as `clip_<timestamp>.mp4`
+plus a matching `clip_<timestamp>.txt` transcript (folder is gitignored).
+
+**B) Desktop GUI (Tkinter)** — the window that opens on your screen:
+
+* a list of received clips (newest auto-selected),
+* a transcript pane for the selected clip,
+* **Play / Stop** buttons for the selected clip's audio,
+* a live status line and the listening URL in the title bar.
+
+The server runs in a background thread; the GUI polls shared state every ~0.8s
+so new clips appear automatically.
+
+---
+
+## Mobile app reference
+
+### Tech stack
 
 | Aspect | Choice |
 |--------|--------|
 | Language | Java |
 | UI | Android XML layouts + `ConstraintLayout` (no Jetpack Compose) |
 | Components | Material Components (`com.google.android.material:material`) |
-| Camera | CameraX (`androidx.camera:*`) |
+| Camera | CameraX (`androidx.camera:*`), front/back switching |
 | Audio | `android.media.MediaRecorder` / `MediaPlayer` |
+| Networking | OkHttp (`com.squareup.okhttp3:okhttp`) |
+| Transcription | OpenAI `gpt-4o-mini-transcribe` |
 | Min / Target SDK | 24 / 34 |
 | Package | `com.example.slam_hri_mobile_application` |
 
----
+### Screens / classes
 
-## Screen / class reference
-
-Each screen is a single `AppCompatActivity` with one matching layout in `res/layout/`. Navigation is manual, using `Intent`s. The action bar is hidden on every screen.
+Each screen is a single `AppCompatActivity` with one matching layout in
+`res/layout/`. Navigation is manual, via `Intent`s. The action bar is hidden.
 
 | Class | Layout | What it does |
 |-------|--------|--------------|
-| `Intro` | `activity_intro.xml` | Splash screen. Shows the app logo, title, and a loading spinner for ~3 seconds, then auto-navigates to `Menu`. Launcher activity. |
-| `Menu` | `activity_menu.xml` | Main menu. Two choices: **Speech command** (go to `SpeechRequest`) or **Speech with image** (go to `CamImg`). |
-| `SpeechRequest` | `activity_speech_request.xml` | Records audio. Requests `RECORD_AUDIO` permission, starts/stops a `MediaRecorder`, saves the clip locally, then opens `SpeechConfirm`. Also offers "Back to menu". |
-| `SpeechConfirm` | `activity_speech_confirm.xml` | Plays back the recorded clip with `MediaPlayer`. "Send request" returns to `Menu`; "Re-record" goes back to `SpeechRequest`. |
-| `CamImg` | `activity_cam_img.xml` | Live **front-camera** preview via CameraX. Requests `CAMERA` permission, captures a photo to the device gallery, then opens `ImageReview`. Also offers "Back to menu". |
-| `ImageReview` | `activity_image_review.xml` | Displays the captured photo (loaded from the path passed via Intent). "Add speech" continues to `SpeechRequest`; "Retake" returns to `CamImg`. |
+| `Intro` | `activity_intro.xml` | Splash: logo, title, loading spinner for ~3s, then opens `Menu`. Launcher activity. |
+| `Menu` | `activity_menu.xml` | Two choices: **Speech command** (→ `SpeechRequest`) or **Speech with image** (→ `CamImg`). |
+| `SpeechRequest` | `activity_speech_request.xml` | Records audio. Shows a live **recording animation** (radar pulse + blinking dot + timer) while recording. Saves the clip and opens `SpeechConfirm`. |
+| `SpeechConfirm` | `activity_speech_confirm.xml` | **Plays** the clip (with playback animation), **auto-transcribes** it via OpenAI and shows the transcript, and on **Send request** **uploads** audio + transcript to the desktop receiver. |
+| `CamImg` | `activity_cam_img.xml` | CameraX preview with a **flip button** to switch front/back cameras. Captures a photo and opens `ImageReview`. |
+| `ImageReview` | `activity_image_review.xml` | Shows the just-captured photo (downsampled + EXIF-rotated). "Add speech" → `SpeechRequest`; "Retake" → `CamImg`. |
+
+Helper classes:
+
+* **`OpenAiClient`** — multipart POST of the audio to OpenAI's transcription
+  endpoint using `BuildConfig.OPENAI_API_KEY`; returns the transcript text.
+* **`ServerUploader`** — multipart POST of the audio + transcript to
+  `BuildConfig.SERVER_URL` + `/upload`.
 
 ### Navigation flow
 
 ```
 Intro ──(3s)──▶ Menu
                  ├─ "Speech command" ───────▶ SpeechRequest ──▶ SpeechConfirm ──▶ Menu
-                 │                                 ▲                  │
-                 │                                 └──── "Re-record" ─┘
+                 │                                 ▲                  │   (transcribe +
+                 │                                 └──── "Re-record" ─┘    upload here)
                  └─ "Speech with image" ─▶ CamImg ──▶ ImageReview ──▶ SpeechRequest ...
                                               ▲            │
                                               └─ "Retake" ─┘
 ```
 
-### Class details
+### Audio & image handling notes
 
-* **`Intro`** — Uses a `Handler.postDelayed` timer to wait 3 seconds before launching `Menu`. Pure splash; no user interaction.
-* **`Menu`** — Wires two clickable controls to `Intent`s that open the speech-only or speech-plus-image flow.
-* **`SpeechRequest`** — Holds a `MediaRecorder` (`mr`). On "start" it configures the mic source / MPEG-4 output and writes to `getFilesDir()/slam_hri_request_sample_1.mp4`. On "stop" it finalizes the file and opens `SpeechConfirm`.
-* **`SpeechConfirm`** — Creates a `MediaPlayer` pointed at the saved clip so the user can verify it before confirming.
-* **`CamImg`** — Binds a CameraX `Preview` + `ImageCapture` to the activity lifecycle using the **front lens**, renders into a `PreviewView`, and saves captures through `MediaStore`. Passes the saved image path to `ImageReview` via an Intent extra (`image_path`).
-* **`ImageReview`** — Decodes the captured file into a `Bitmap` and shows it, then lets the user proceed to attach speech or retake.
+* Audio is recorded to `getFilesDir()/slam_hri_request_sample_1.mp4`.
+* Photos are captured to a single app file (`getFilesDir()/captured_image.jpg`)
+  that is **overwritten each time**, so the review screen always shows the photo
+  you just took (this fixed an earlier stale-image bug).
 
----
-
-## Resources & design system
-
-UI styling is centralized so screens stay consistent and theming is easy.
+### Resources & design system
 
 | File | Purpose |
 |------|---------|
-| `res/values/colors.xml` / `res/values-night/colors.xml` | Semantic color palette (brand, accent, danger, surfaces, text) with a dark-mode variant. |
-| `res/values/themes.xml` / `res/values-night/themes.xml` | App theme (Material), gradient window background, status/nav bar colors, and shared text/button styles. |
-| `res/values/dimens.xml` | Spacing, sizing, corner-radius, and typography size tokens. |
-| `res/values/strings.xml` | All UI copy and accessibility content descriptions. |
-| `res/drawable/` | Vector icons (`ic_mic`, `ic_stop`, `ic_play`, `ic_camera`, `ic_send`, `ic_arrow_back`), gradient backgrounds, circular button backgrounds, and the launcher icon. |
+| `res/values/colors.xml` / `res/values-night/colors.xml` | Semantic palette (brand, accent, danger, surfaces, text) + dark variant. |
+| `res/values/themes.xml` / `res/values-night/themes.xml` | Material theme, gradient window background, status/nav bar colors, text/button styles. |
+| `res/values/dimens.xml` | Spacing, sizing, corner-radius, typography tokens. |
+| `res/values/strings.xml` | All UI copy, transcription/upload status text, accessibility descriptions. |
+| `res/drawable/` | Vector icons, gradient backgrounds, circular button + pulse-ring backgrounds, launcher icon. |
 
-**Accessibility notes (relevant for BVI users):** large touch targets, high-contrast colors, full dark-mode support, and `contentDescription`s on interactive elements.
+**Accessibility (for BVI users):** large touch targets, high-contrast colors,
+full dark-mode support, spoken-state announcements, and `contentDescription`s on
+interactive elements.
+
+### Permissions (`AndroidManifest.xml`)
+
+`INTERNET`, `ACCESS_WIFI_STATE`, `ACCESS_NETWORK_STATE`,
+`READ/WRITE_EXTERNAL_STORAGE`, `CAMERA`, `RECORD_AUDIO`. Camera and microphone
+are requested at runtime. `usesCleartextTraffic="true"` is set so the phone can
+reach the local `http://` receiver.
 
 ---
 
-## Permissions (declared in `AndroidManifest.xml`)
+## Troubleshooting
 
-`INTERNET`, `ACCESS_WIFI_STATE`, `ACCESS_NETWORK_STATE`, `READ/WRITE_EXTERNAL_STORAGE`, `CAMERA`, `RECORD_AUDIO`. Camera and microphone are requested at runtime.
+* **Phone can't reach the computer** — confirm both are on the same Wi-Fi, that
+  `SERVER_URL` matches the IP printed by `receiver.py`, and that your firewall
+  allows incoming connections on port 8000 (macOS may prompt the first time).
+* **`GET /` shows 404** — you're on an old server build; restart `receiver.py`
+  (the status page route was added). `/upload` and `/health` always exist.
+* **Transcript empty on the desktop** — you likely tapped **Send** before
+  transcription finished. Wait for the transcript to appear on the phone first.
+* **No transcript on the phone** — make sure `OPENAI_API_KEY` is set in `.env`
+  and you rebuilt the app.
+* **Computer's IP changed** — update `SERVER_URL` in `.env` and rebuild.
 
 ---
 
 ## Known limitations / next steps
 
-* **No upload yet** — "Send request" only navigates back to the menu; audio/image are not transmitted to a robot or server.
-* **Audio recording on older devices** — `MediaRecorder` is only constructed on API 31+, so recording will not work below that despite `minSdk 24`.
-* **Hardcoded image path** in the capture → review handoff.
-* Future work: wire up the network layer to the SLAM/HRI backend and stream commands to the robot.
+* **API key in the APK** (Option A design) — acceptable for a private prototype;
+  for production, proxy OpenAI through a server so the key never ships.
+* **Audio recording on older devices** — `MediaRecorder` is only constructed on
+  API 31+, so recording will not work below that despite `minSdk 24`.
+* **No robot integration yet** — the receiver currently just displays data; the
+  SLAM/HRI backend and command streaming to the robot are future work.
