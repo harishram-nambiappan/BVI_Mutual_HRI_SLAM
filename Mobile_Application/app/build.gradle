@@ -19,6 +19,7 @@ if (configFile.exists()) {
     configFile.withInputStream { configProps.load(it) }
 }
 def transcriptionModel = configProps.getProperty("TRANSCRIPTION_MODEL", "gpt-4o-mini-transcribe")
+def visionModel = configProps.getProperty("VISION_MODEL", "gpt-5")
 
 android {
     namespace 'com.example.slam_hri_mobile_application'
@@ -36,6 +37,7 @@ android {
         buildConfigField "String", "OPENAI_API_KEY", "\"${openAiKey}\""
         buildConfigField "String", "SERVER_URL", "\"${serverUrl}\""
         buildConfigField "String", "TRANSCRIPTION_MODEL", "\"${transcriptionModel}\""
+        buildConfigField "String", "VISION_MODEL", "\"${visionModel}\""
     }
 
     buildFeatures {
