@@ -61,9 +61,10 @@ BVI_Mutual_HRI_SLAM/
 │
 └── Computer_Receiver/            # Python desktop receiver
     ├── receiver.py               # Flask HTTP server + Tkinter GUI (one process)
+    ├── auto_deploy.sh            # one-command setup + run (venv, install, start)
     ├── requirements.txt          # Flask
     ├── README.md                 # receiver-specific docs
-    ├── .gitignore                # ignores received/ and __pycache__
+    ├── .gitignore                # ignores received/, .venv/ and __pycache__
     └── received/                 # (created at runtime) saved clips + transcripts
 ```
 
@@ -145,6 +146,17 @@ Exposed as `BuildConfig.TRANSCRIPTION_MODEL` and used by `OpenAiClient`.
 ## Setup & run (full system)
 
 ### 1. Start the desktop receiver
+
+**Easiest — use the deploy script** (creates a virtualenv, installs Flask, and
+starts the receiver). Make it executable once, then run it:
+
+```bash
+cd Computer_Receiver
+chmod +x auto_deploy.sh   # one time, to make it executable
+./auto_deploy.sh
+```
+
+**Or do it manually:**
 
 ```bash
 cd Computer_Receiver

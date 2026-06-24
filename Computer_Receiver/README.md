@@ -27,6 +27,19 @@ phone records audio
 
 ## Run
 
+### Easiest: the deploy script
+
+`auto_deploy.sh` creates a local virtualenv (`.venv`), installs Flask, and starts
+the receiver. Make it executable once, then run it:
+
+```bash
+cd Computer_Receiver
+chmod +x auto_deploy.sh   # one time
+./auto_deploy.sh
+```
+
+### Or run manually
+
 ```bash
 cd Computer_Receiver
 pip install -r requirements.txt
