@@ -44,6 +44,21 @@ records_lock = threading.Lock()
 app = Flask(__name__)
 
 
+@app.route("/", methods=["GET"])
+def index():
+    with records_lock:
+        count = len(records)
+    return (
+        "<html><body style='font-family:sans-serif;padding:24px'>"
+        "<h2>HRI SLAM Transcription Receiver</h2>"
+        "<p>The server is running and reachable. ✅</p>"
+        f"<p>Clips received so far: <b>{count}</b></p>"
+        "<p>The phone uploads to <code>POST /upload</code>. "
+        "Health check: <code>GET /health</code>.</p>"
+        "</body></html>"
+    )
+
+
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({"status": "ok"})
@@ -102,6 +117,7 @@ class ReceiverGui:
         self.root = root
         self.play_proc = None
         self.shown_count = 0
+        self.selected_index = None
 
         root.title("HRI SLAM - Transcription Receiver")
         root.geometry("820x520")
@@ -123,7 +139,9 @@ class ReceiverGui:
         left.pack(side=tk.LEFT, fill=tk.Y)
 
         ttk.Label(left, text="Received clips").pack(side=tk.TOP, anchor="w")
-        self.listbox = tk.Listbox(left, width=28, activestyle="dotbox")
+        self.listbox = tk.Listbox(
+            left, width=28, activestyle="dotbox", exportselection=False
+        )
         self.listbox.pack(side=tk.TOP, fill=tk.Y, expand=True, pady=(4, 0))
         self.listbox.bind("<<ListboxSelect>>", self.on_select)
 
@@ -157,39 +175,40 @@ class ReceiverGui:
             items = [r["time"] for r in records]
 
         if count != self.shown_count:
-            current = self.listbox.curselection()
             self.listbox.delete(0, tk.END)
             for label in items:
                 self.listbox.insert(tk.END, label)
             self.shown_count = count
-            # Auto-select the newest clip.
+            # Auto-select the newest clip and show its transcript.
+            newest = count - 1
             self.listbox.selection_clear(0, tk.END)
-            self.listbox.selection_set(tk.END)
-            self.listbox.see(tk.END)
-            self.on_select(None)
+            self.listbox.selection_set(newest)
+            self.listbox.see(newest)
+            self.display(newest)
             self.status.config(text=f"{count} clip(s) received")
 
         self.root.after(800, self.refresh)
 
-    def selected_record(self):
-        sel = self.listbox.curselection()
-        if not sel:
-            return None
-        idx = sel[0]
-        with records_lock:
-            if 0 <= idx < len(records):
-                return records[idx]
-        return None
-
     def on_select(self, _event):
-        rec = self.selected_record()
+        sel = self.listbox.curselection()
+        if sel:
+            self.display(sel[0])
+
+    def display(self, idx):
+        """Show the transcript for the record at idx (does not rely on
+        Listbox selection state, which Tkinter can clear unexpectedly)."""
+        with records_lock:
+            rec = records[idx] if 0 <= idx < len(records) else None
+        self.selected_index = idx
         self.transcript_box.delete("1.0", tk.END)
         if rec:
             text = rec["transcript"] or "(no transcript)"
             self.transcript_box.insert(tk.END, text)
 
     def play_audio(self):
-        rec = self.selected_record()
+        idx = self.selected_index
+        with records_lock:
+            rec = records[idx] if (idx is not None and 0 <= idx < len(records)) else None
         if not rec or not rec["audio"] or not os.path.exists(rec["audio"]):
             self.status.config(text="No audio file for this clip")
             return
