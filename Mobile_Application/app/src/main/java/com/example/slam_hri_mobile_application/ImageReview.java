@@ -34,7 +34,7 @@ public class ImageReview extends AppCompatActivity {
         add_speech = (TextView) findViewById(R.id.textView18);
         back = (TextView) findViewById(R.id.textView19);
 
-        String imagePath = getIntent().getStringExtra("image_path");
+        final String imagePath = getIntent().getStringExtra("image_path");
         if (!TextUtils.isEmpty(imagePath)) {
             bm = loadOrientedBitmap(imagePath);
             iv.setImageBitmap(bm);
@@ -44,6 +44,7 @@ public class ImageReview extends AppCompatActivity {
             @Override
             public void onClick(View view) {
                 Intent speech_intent = new Intent(getApplicationContext(), SpeechRequest.class);
+                speech_intent.putExtra("image_path", imagePath);
                 startActivity(speech_intent);
             }
         });

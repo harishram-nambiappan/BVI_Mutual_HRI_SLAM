@@ -40,6 +40,12 @@ public class SpeechConfirm extends AppCompatActivity {
 
     File audioFile;
 
+    // Image flow (null/absent for speech-only). Description is generated in the
+    // background and sent to the desktop app; it is not shown on the phone.
+    String imagePath;
+    File imageFile;
+    volatile String lastDescription = "";
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -71,6 +77,9 @@ public class SpeechConfirm extends AppCompatActivity {
         });
 
         startTranscription();
+
+        imagePath = getIntent().getStringExtra("image_path");
+        startDescription();
 
         play_record.setOnClickListener(new View.OnClickListener(){
             @Override
@@ -138,6 +147,33 @@ public class SpeechConfirm extends AppCompatActivity {
                         Toast.makeText(getApplicationContext(), msg, Toast.LENGTH_LONG).show();
                     }
                 });
+            }
+        });
+    }
+
+    private void startDescription() {
+        lastDescription = "";
+        if (imagePath == null || imagePath.isEmpty()) {
+            imageFile = null;
+            return;
+        }
+        File img = new File(imagePath);
+        if (!img.exists()) {
+            imageFile = null;
+            return;
+        }
+        imageFile = img;
+
+        // Runs in the background; result is kept for upload (not shown on phone).
+        OpenAiVision.describe(img, new OpenAiVision.DescriptionCallback() {
+            @Override
+            public void onResult(String description) {
+                lastDescription = description != null ? description : "";
+            }
+
+            @Override
+            public void onError(String message) {
+                lastDescription = "";
             }
         });
     }
