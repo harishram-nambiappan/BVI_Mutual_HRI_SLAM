@@ -97,7 +97,11 @@ public class SpeechRequest extends AppCompatActivity {
                 try {
                     mr.setAudioSource(MediaRecorder.AudioSource.MIC);
                     mr.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
-                    mr.setAudioEncoder(MediaRecorder.AudioEncoder.DEFAULT);
+                    // AAC (not DEFAULT/AMR) so the .mp4 is playable everywhere,
+                    // including macOS afplay on the desktop receiver.
+                    mr.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
+                    mr.setAudioSamplingRate(44100);
+                    mr.setAudioEncodingBitRate(128000);
                     mr.setOutputFile(getFilesDir()+"/slam_hri_request_sample_1.mp4");
                     mr.prepare();
                     mr.start();
