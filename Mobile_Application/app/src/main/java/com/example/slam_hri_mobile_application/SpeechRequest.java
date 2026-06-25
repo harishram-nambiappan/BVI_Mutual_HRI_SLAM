@@ -46,6 +46,7 @@ public class SpeechRequest extends AppCompatActivity {
 
     // Carried through from the image flow (null for speech-only).
     String imagePath;
+    String description;
 
     final Runnable timerRunnable = new Runnable() {
         @Override
@@ -70,6 +71,7 @@ public class SpeechRequest extends AppCompatActivity {
         back = (TextView) findViewById(R.id.textView7);
 
         imagePath = getIntent().getStringExtra("image_path");
+        description = getIntent().getStringExtra("description");
 
         pulseRing1 = findViewById(R.id.pulseRing1);
         pulseRing2 = findViewById(R.id.pulseRing2);
@@ -128,6 +130,7 @@ public class SpeechRequest extends AppCompatActivity {
 
                 Intent confirm_intent = new Intent(getApplicationContext(), SpeechConfirm.class);
                 confirm_intent.putExtra("image_path", imagePath);
+                confirm_intent.putExtra("description", description);
                 startActivity(confirm_intent);
             }
         });

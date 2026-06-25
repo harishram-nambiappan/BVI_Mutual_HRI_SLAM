@@ -39,25 +39,20 @@ public class OpenAiVision {
     private static final String ENDPOINT = "https://api.openai.com/v1/chat/completions";
     private static final String DEFAULT_MODEL = "gpt-5";
 
-    // Context for the system: a blind/visually-impaired person walks an indoor
-    // public space holding the phone, reporting obstacles and points of interest
-    // so robots can understand and navigate the environment.
+    // Context: a person walks an indoor public space holding the phone, reporting
+    // OBSTACLES so robots can navigate. Keep the answer short and structured.
     private static final String SYSTEM_PROMPT =
-            "You are a visual scene-description assistant for an assistive human-robot "
-            + "mapping system. A blind or visually impaired person is walking through an "
-            + "indoor public space (such as an airport terminal) while holding a phone. "
-            + "Their job is to report obstacles, hazards, and points of interest so that "
-            + "robots can understand and navigate the environment. They have just captured "
-            + "a photo of what is in front of them. Describe the photo in high detail and in "
-            + "a way that is useful for robot navigation and environment mapping. Include: "
-            + "notable objects and obstacles, their approximate position (left, center, right) "
-            + "and distance (near, mid, far), people, doors, signage and any readable text, "
-            + "floor and path conditions, and anything that could block or guide movement. "
-            + "Be precise, concrete, and spatially organized. Do not guess beyond what is "
-            + "visible.";
+            "You analyze one photo taken by a person walking through an indoor public "
+            + "space (such as an airport) who is reporting OBSTACLES so robots can "
+            + "navigate. Identify the single most relevant obstacle/object in front of "
+            + "the user. Respond with ONLY a compact JSON object, no extra text, using "
+            + "these keys: \"object\" (what it is), \"distance\" (approximate, e.g. \"~2 m\" "
+            + "or near/mid/far), \"position\" (left, center, or right), \"activity\" (what "
+            + "it is doing, or \"stationary\"), \"surface\" (what it rests on or the floor "
+            + "type), \"summary\" (one short sentence). Keep every value short and concrete.";
 
     private static final String USER_PROMPT =
-            "Describe this image in high detail for robot navigation and mapping.";
+            "Identify the main obstacle in this image as JSON.";
 
     private static final OkHttpClient client = new OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
@@ -101,7 +96,8 @@ public class OpenAiVision {
 
             JSONObject payload = new JSONObject()
                     .put("model", model())
-                    .put("messages", new JSONArray().put(systemMsg).put(userMsg));
+                    .put("messages", new JSONArray().put(systemMsg).put(userMsg))
+                    .put("response_format", new JSONObject().put("type", "json_object"));
 
             requestJson = payload.toString();
         } catch (Exception e) {

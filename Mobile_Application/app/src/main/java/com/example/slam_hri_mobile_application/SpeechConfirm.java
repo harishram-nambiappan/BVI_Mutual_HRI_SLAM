@@ -40,13 +40,11 @@ public class SpeechConfirm extends AppCompatActivity {
 
     File audioFile;
 
-    // Image flow (null/absent for speech-only). Description is generated in the
-    // background and sent to the desktop app; it is not shown on the phone.
+    // Image flow (null/absent for speech-only). The description was already
+    // generated on the analysis screen and passed in via the Intent.
     String imagePath;
     File imageFile;
-    volatile String lastDescription = "";
-    volatile boolean descriptionDone = true;   // true when there's nothing to wait for
-    boolean pendingSend = false;                // user tapped Send while describing
+    String lastDescription = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -81,7 +79,14 @@ public class SpeechConfirm extends AppCompatActivity {
         startTranscription();
 
         imagePath = getIntent().getStringExtra("image_path");
-        startDescription();
+        lastDescription = getIntent().getStringExtra("description");
+        if (lastDescription == null) {
+            lastDescription = "";
+        }
+        if (imagePath != null && !imagePath.isEmpty()) {
+            File img = new File(imagePath);
+            imageFile = img.exists() ? img : null;
+        }
 
         play_record.setOnClickListener(new View.OnClickListener(){
             @Override
@@ -123,18 +128,6 @@ public class SpeechConfirm extends AppCompatActivity {
     }
 
     private void sendToServer() {
-        // In image mode, wait for the GPT-5 description before uploading so it
-        // is actually included (the vision call is slower than transcription).
-        if (imageFile != null && !descriptionDone) {
-            pendingSend = true;
-            send_speech.setEnabled(false);
-            Toast.makeText(getApplicationContext(), R.string.waiting_description, Toast.LENGTH_SHORT).show();
-            return;
-        }
-        doUpload();
-    }
-
-    private void doUpload() {
         Toast.makeText(getApplicationContext(), R.string.sending, Toast.LENGTH_SHORT).show();
         send_speech.setEnabled(false);
 
@@ -164,52 +157,6 @@ public class SpeechConfirm extends AppCompatActivity {
                         Toast.makeText(getApplicationContext(), msg, Toast.LENGTH_LONG).show();
                     }
                 });
-            }
-        });
-    }
-
-    private void startDescription() {
-        lastDescription = "";
-        if (imagePath == null || imagePath.isEmpty()) {
-            imageFile = null;
-            descriptionDone = true;
-            return;
-        }
-        File img = new File(imagePath);
-        if (!img.exists()) {
-            imageFile = null;
-            descriptionDone = true;
-            return;
-        }
-        imageFile = img;
-        descriptionDone = false;
-
-        // Runs in the background; result is kept for upload (not shown on phone).
-        OpenAiVision.describe(img, new OpenAiVision.DescriptionCallback() {
-            @Override
-            public void onResult(final String description) {
-                onDescriptionFinished(description != null ? description : "");
-            }
-
-            @Override
-            public void onError(final String message) {
-                // Surface the failure (so it's visible on the desktop) instead
-                // of silently sending an empty description.
-                onDescriptionFinished("[image description unavailable: " + message + "]");
-            }
-        });
-    }
-
-    private void onDescriptionFinished(final String result) {
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                lastDescription = result;
-                descriptionDone = true;
-                if (pendingSend) {
-                    pendingSend = false;
-                    doUpload();
-                }
             }
         });
     }

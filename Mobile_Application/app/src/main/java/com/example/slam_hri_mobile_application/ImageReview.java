@@ -43,9 +43,9 @@ public class ImageReview extends AppCompatActivity {
         add_speech.setOnClickListener(new View.OnClickListener(){
             @Override
             public void onClick(View view) {
-                Intent speech_intent = new Intent(getApplicationContext(), SpeechRequest.class);
-                speech_intent.putExtra("image_path", imagePath);
-                startActivity(speech_intent);
+                Intent analysis_intent = new Intent(getApplicationContext(), ImageAnalysis.class);
+                analysis_intent.putExtra("image_path", imagePath);
+                startActivity(analysis_intent);
             }
         });
 

@@ -29,6 +29,9 @@
             android:name=".ImageReview"
             android:exported="false" />
         <activity
+            android:name=".ImageAnalysis"
+            android:exported="false" />
+        <activity
             android:name=".CamImg"
             android:exported="false" />
         <activity

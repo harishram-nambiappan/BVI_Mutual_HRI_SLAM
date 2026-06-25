@@ -59,8 +59,8 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginBottom="@dimen/space_m"
-        android:text="@string/add_speech"
-        app:icon="@drawable/ic_mic"
+        android:text="@string/proceed"
+        app:icon="@drawable/ic_send"
         app:layout_constraintBottom_toTopOf="@+id/textView19"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent" />

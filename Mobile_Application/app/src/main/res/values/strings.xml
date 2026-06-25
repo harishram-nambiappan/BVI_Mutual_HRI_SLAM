@@ -52,9 +52,17 @@
 
     <!-- Review -->
     <string name="review_title">Review image</string>
-    <string name="review_subtitle">Looks good? Add your speech command</string>
+    <string name="review_subtitle">Looks good? Continue, or retake the photo</string>
     <string name="add_speech">Add speech</string>
     <string name="retake">Retake</string>
+    <string name="proceed">Proceed</string>
+
+    <!-- Image analysis -->
+    <string name="analysis_title">Image analysis</string>
+    <string name="analysis_subtitle">Checking what\'s in the photo</string>
+    <string name="analyzing">Analyzing image\u2026</string>
+    <string name="analysis_result_header">What we found</string>
+    <string name="analysis_failed">Couldn\'t analyze the image. Tap to retry.</string>
 
     <!-- Content descriptions -->
     <string name="cd_logo">App logo</string>
