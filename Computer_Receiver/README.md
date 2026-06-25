@@ -1,19 +1,20 @@
 # Computer Receiver
 
-A small desktop app that receives speech clips and transcripts from the phone
-and lets you **play the audio** and **read the transcript** in a simple GUI.
+A desktop app that receives **reports** from the phone (audio + transcript, and in
+image mode a photo + GPT obstacle description) and lets you **read the transcript &
+description, preview the photo, and play the audio** in a clean GUI.
 
 It runs two things in one process:
 - an HTTP server (Flask) the phone uploads to, and
-- a Tkinter GUI to browse/play received clips.
+- a Tkinter GUI to browse received reports.
 
 ## Data flow
 
 ```
-phone records audio
-   -> phone transcribes via OpenAI
-   -> phone POSTs audio + transcript to this receiver (/upload)
-   -> GUI shows the transcript and plays the audio
+speech only:   record audio -> OpenAI transcribe -> POST audio + transcript + mode
+speech+image:  capture photo -> OpenAI vision (JSON description) -> add speech
+               -> record + transcribe -> POST audio + transcript + image + description + mode
+   -> GUI shows the mode, transcript, description, photo preview, and plays the audio
 ```
 
 ## Requirements
@@ -32,8 +33,9 @@ phone records audio
 
 ### Easiest: the deploy script
 
-`auto_deploy.sh` creates a local virtualenv (`.venv`), installs Flask, and starts
-the receiver. Make it executable once, then run it:
+`auto_deploy.sh` creates a local virtualenv (`.venv`), installs Flask + Pillow,
+picks a Tk-capable Python, and starts the receiver. Make it executable once, then
+run it:
 
 ```bash
 cd Computer_Receiver
@@ -59,14 +61,19 @@ The GUI title bar shows the same URL.
    ```
    SERVER_URL=http://<your-computer-ip>:8000
    ```
-3. Rebuild/run the app. On the **Confirm request** screen, tap **Send request**
-   to upload the clip + transcript.
+3. Rebuild/run the app. Record (and optionally capture/analyze a photo), then
+   **Send request** to upload the report.
 
 ## Notes
 
 - Uploads are saved under `Computer_Receiver/received/` (gitignored) as
-  `clip_<timestamp>.mp4` plus a matching `.txt` transcript.
-- Endpoints: `POST /upload` (form fields `audio` file + `transcript` text) and
-  `GET /health`.
+  `clip_<timestamp>.mp4` (audio), `clip_<timestamp>.jpg` (photo, image mode),
+  `clip_<timestamp>.txt` (transcript), and `clip_<timestamp>_description.txt`.
+- Endpoints:
+  - `GET /` — status page · `GET /health` — JSON status
+  - `POST /upload` — multipart: `audio` (file), `transcript`, `mode`, and in image
+    mode `image` (file) + `description`
+- Image previews use **Pillow** (and apply EXIF orientation). Without Pillow the
+  GUI still works and offers an **Open image** button instead.
 - If the phone can't connect: check the IP, that both devices share the Wi-Fi,
   and that your firewall allows incoming connections on port 8000.

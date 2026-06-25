@@ -2,26 +2,43 @@
 
 A research prototype for **Mutual Human-Robot Interaction (HRI)** aimed at **Blind and Visually-Impaired (BVI)** users in a **SLAM** (Simultaneous Localization and Mapping) context.
 
+**Scenario:** a person walks an indoor public space (e.g. an airport) holding the
+phone and reports **obstacles / points of interest** ("banana here") so robots can
+understand and navigate the environment. The phone captures the spoken report and,
+optionally, a photo; OpenAI turns the audio into a **transcript** and the photo into
+a structured **obstacle description**; everything is sent to a desktop app for review.
+
 The system has two parts:
 
-1. **`Mobile_Application/`** — an Android client. The user records a **spoken command**, optionally attaches a **camera photo**, the clip is **transcribed by OpenAI on the phone**, and the audio + transcript are **uploaded to a desktop receiver**.
-2. **`Computer_Receiver/`** — a small Python desktop app (HTTP server + GUI) that receives clips from the phone, lets you **read the transcript** and **play the audio**.
+1. **`Mobile_Application/`** — an Android client. The user records a **spoken
+   command** and optionally captures a **photo**. On the phone, OpenAI
+   **transcribes** the audio and **describes** the photo (as a JSON obstacle
+   object). The audio, transcript, photo, description, and mode are **uploaded to
+   the desktop receiver**.
+2. **`Computer_Receiver/`** — a Python desktop app (HTTP server + GUI) that
+   receives reports and lets you **read the transcript & description, preview the
+   photo, and play the audio**.
+
+> Status: prototype. There is **no robot integration yet** — the desktop app just
+> collects and displays the reports.
 
 ---
 
 ## End-to-end flow
 
 ```
-[ Phone ]                                  [ Your computer ]
+[ Phone ]                                              [ Your computer ]
 
-record audio ──▶ transcribe via OpenAI ──▶ transcript shown on phone
-     │                                            │
-     │  POST audio + transcript                   │
-     └──────────────▶ http://<pc-ip>:8000/upload ─┴─▶ Python receiver
-                                                       ├─ HTTP server (Flask)
-                                                       └─ Desktop GUI (Tkinter):
-                                                          list clips · show
-                                                          transcript · play audio
+speech only:
+  record audio ─▶ OpenAI transcribe ─▶ transcript on phone
+                                           │ POST audio + transcript + mode
+                                           ▼
+speech + image:                       http://<pc-ip>:8000/upload ─▶ Python receiver
+  capture photo ─▶ OpenAI vision (GPT)                                ├─ HTTP server (Flask)
+     ─▶ JSON obstacle description on phone                            └─ Desktop GUI (Tkinter):
+  ─▶ add speech ─▶ record + transcribe                                   reports list · mode badge
+     ─▶ POST audio + transcript + image + description + mode              transcript · description
+                                                                          photo preview · play audio
 ```
 
 The phone and computer must be on the **same Wi-Fi network**.
@@ -37,36 +54,38 @@ BVI_Mutual_HRI_SLAM/
 ├── Mobile_Application/            # Android app (Java, XML layouts)
 │   ├── .env                       # SECRETS (gitignored, you create this): OpenAI key + server URL
 │   ├── .env.example               # template for .env (committed)
-│   ├── config.properties          # non-secret config (committed): transcription model
+│   ├── config.properties          # non-secret config (committed): models + prompts
 │   ├── build.gradle               # root Gradle config (AGP 8.2.2)
 │   └── app/
-│       ├── build.gradle           # deps, SDK levels, reads .env -> BuildConfig
+│       ├── build.gradle           # deps, SDK levels, reads .env + config.properties -> BuildConfig
 │       └── src/main/
 │           ├── AndroidManifest.xml
 │           ├── java/com/example/slam_hri_mobile_application/
 │           │   ├── Intro.java          # splash screen
-│           │   ├── Menu.java           # main menu
+│           │   ├── Menu.java           # main menu (speech / speech+image)
 │           │   ├── SpeechRequest.java  # record audio (+ recording animation)
-│           │   ├── SpeechConfirm.java  # play, transcribe, show transcript, upload
+│           │   ├── SpeechConfirm.java  # play, transcribe, gate Send, upload
 │           │   ├── CamImg.java         # camera preview + capture + front/back flip
-│           │   ├── ImageReview.java    # review captured photo
-│           │   ├── OpenAiClient.java   # calls OpenAI transcription API
-│           │   └── ServerUploader.java # uploads audio + transcript to the PC
+│           │   ├── ImageReview.java    # review photo: Proceed / Retake
+│           │   ├── ImageAnalysis.java  # "Analyzing image" screen (vision + scan animation)
+│           │   ├── OpenAiClient.java   # OpenAI audio transcription
+│           │   ├── OpenAiVision.java   # OpenAI photo description (JSON)
+│           │   └── ServerUploader.java # uploads audio+transcript+image+description+mode
 │           └── res/
 │               ├── layout/        # one XML layout per screen
 │               ├── values/        # colors, dimens, strings, themes, styles
 │               ├── values-night/  # dark-theme color/theme overrides
-│               ├── drawable/      # vector icons + backgrounds
+│               ├── drawable/      # vector icons, gradients, pulse/scan backgrounds
 │               └── mipmap-*/      # launcher icons
 │
 └── Computer_Receiver/            # Python desktop receiver
     ├── receiver.py               # Flask HTTP server + Tkinter GUI (one process)
     ├── receiver_icon.png         # app icon shown in the GUI window/header
     ├── auto_deploy.sh            # one-command setup + run (venv, install, start)
-    ├── requirements.txt          # Flask
+    ├── requirements.txt          # Flask + Pillow
     ├── README.md                 # receiver-specific docs
-    ├── .gitignore                # ignores received/, .venv/ and __pycache__
-    └── received/                 # (created at runtime) saved clips + transcripts
+    ├── .gitignore                # ignores received/, .venv/, __pycache__
+    └── received/                 # (created at runtime) saved clips/photos/transcripts
 ```
 
 ---
@@ -77,70 +96,81 @@ BVI_Mutual_HRI_SLAM/
 * Android Studio (with the Android SDK) and a JDK
 * An Android device or emulator on **Android 7.0 (API 24)** or higher
 * A **camera** and **microphone**
-* An **OpenAI API key** (for transcription)
+* An **OpenAI API key** (used for both transcription and photo description)
 
 **Desktop receiver**
-* Python 3.9+ (Tkinter ships with standard CPython)
-* `pip install -r Computer_Receiver/requirements.txt` (installs Flask)
-* Audio playback: macOS uses built-in `afplay`; Windows opens the default player; Linux uses `ffplay` (install `ffmpeg`)
+* Python 3.9+ **with Tkinter (Tk)** for the GUI (Anaconda / python.org include it;
+  Homebrew Python often does not — `auto_deploy.sh` auto-picks a Tk-capable Python)
+* Dependencies: **Flask** + **Pillow** (`pip install -r Computer_Receiver/requirements.txt`)
+* Audio playback: macOS uses built-in `afplay`; Windows opens the default player;
+  Linux uses `ffplay` (install `ffmpeg`)
 
 ---
 
 ## Configuration
 
-There are **two** config files for the mobile app, by design:
+Two config files for the mobile app, by design:
 
 | File | Committed? | Holds | You edit it? |
 |------|-----------|-------|--------------|
 | `Mobile_Application/.env` | **No** (gitignored) | **Secrets**: OpenAI key + your computer's IP/URL | **Yes — you must create it** |
-| `Mobile_Application/config.properties` | Yes | **Non-secret config**: the transcription model | Only to change the model |
+| `Mobile_Application/config.properties` | Yes | **Non-secret config**: models + prompts | Optional (to tune models/prompts) |
 
 Both are read by `app/build.gradle` at build time and exposed via `BuildConfig`.
 
 ### 1. You MUST create the `.env` file
 
-The repo does **not** ship a `.env` (it's gitignored so secrets never get
-committed). Create it from the template before building:
+The repo does **not** ship a `.env` (it's gitignored). Create it from the template:
 
 ```bash
 cd Mobile_Application
 cp .env.example .env
 ```
 
-Then open `Mobile_Application/.env` and set both values:
+Then set both values in `Mobile_Application/.env`:
 
 ```properties
-# Your OpenAI API key (used by the phone to transcribe audio)
+# Your OpenAI API key (used by the phone for transcription AND photo description)
 OPENAI_API_KEY=sk-your-real-key-here
 
 # Your computer's LAN IP + the receiver port 8000 (no trailing /upload).
-# This must match the URL that receiver.py prints on startup.
+# Must match the URL that receiver.py prints on startup.
 SERVER_URL=http://192.168.1.153:8000
 ```
 
-| Key | What it is | Example |
-|-----|------------|---------|
-| `OPENAI_API_KEY` | OpenAI key, used by the phone for transcription | `sk-...` |
-| `SERVER_URL` | The desktop receiver's address on your LAN | `http://192.168.1.153:8000` |
-
 Exposed as `BuildConfig.OPENAI_API_KEY` and `BuildConfig.SERVER_URL`.
 
-> ⚠️ The phone and the computer **must be on the same Wi-Fi network** for the
-> upload to work. If your computer's IP changes, update `SERVER_URL` and rebuild.
+> ⚠️ The phone and the computer **must be on the same Wi-Fi network**. If your
+> computer's IP changes, update `SERVER_URL` and rebuild.
 
 > 🔒 Security note: with this design the OpenAI key is compiled into the APK —
 > fine for a private prototype, but don't distribute the built APK.
 
-### 2. The transcription model lives in `config.properties`
+### 2. Models and prompts live in `config.properties`
 
-This is non-secret, so it's committed. Change it here to swap models:
+Non-secret, so it's committed. Edit here to change models or prompts (no code
+changes needed):
 
 ```properties
-# Examples: gpt-4o-mini-transcribe, gpt-4o-transcribe, whisper-1
-TRANSCRIPTION_MODEL=gpt-4o-mini-transcribe
+# --- Speech-to-text (audio) ---
+TRANSCRIPTION_MODEL=gpt-4o-mini-transcribe   # or gpt-4o-transcribe, whisper-1
+TRANSCRIPTION_PROMPT=                         # optional bias prompt; blank = none
+
+# --- Vision (photo description) ---
+VISION_MODEL=gpt-5                            # or gpt-4o
+# NOTE: the system prompt MUST contain the word "json" (the app requests a JSON object).
+VISION_SYSTEM_PROMPT=You analyze one photo ... compact JSON object ...
+VISION_USER_PROMPT=Identify the main obstacle in this image as JSON.
 ```
 
-Exposed as `BuildConfig.TRANSCRIPTION_MODEL` and used by `OpenAiClient`.
+Exposed as `BuildConfig.TRANSCRIPTION_MODEL`, `BuildConfig.TRANSCRIPTION_PROMPT`,
+`BuildConfig.VISION_MODEL`, `BuildConfig.VISION_SYSTEM_PROMPT`,
+`BuildConfig.VISION_USER_PROMPT`. Prompts are escaped automatically, so quotes in
+the JSON keys are fine.
+
+> The vision call uses `response_format: json_object`, which OpenAI requires the
+> prompt to mention **"json"**. If you remove "json" from `VISION_SYSTEM_PROMPT`,
+> the vision request will error.
 
 ---
 
@@ -148,8 +178,8 @@ Exposed as `BuildConfig.TRANSCRIPTION_MODEL` and used by `OpenAiClient`.
 
 ### 1. Start the desktop receiver
 
-**Easiest — use the deploy script** (creates a virtualenv, installs Flask, and
-starts the receiver). Make it executable once, then run it:
+**Easiest — the deploy script** (creates a virtualenv, installs Flask + Pillow,
+picks a Tk-capable Python, and starts the receiver):
 
 ```bash
 cd Computer_Receiver
@@ -157,7 +187,7 @@ chmod +x auto_deploy.sh   # one time, to make it executable
 ./auto_deploy.sh
 ```
 
-**Or do it manually:**
+**Or manually:**
 
 ```bash
 cd Computer_Receiver
@@ -165,14 +195,14 @@ pip install -r requirements.txt
 python receiver.py
 ```
 
-On start it prints (and shows in the GUI title bar) the URL it is listening on,
-e.g. `http://192.168.1.153:8000`. A **desktop window** opens — that is the GUI
-(it is a native window, not a web page, so it has no URL of its own).
+On start it prints (and shows in the GUI header) the URL it is listening on, e.g.
+`http://192.168.1.153:8000`. A **desktop window** opens — that is the GUI (a native
+window, not a web page, so it has no URL of its own).
 
 ### 2. Point the phone at your computer
 
-In `Mobile_Application/.env` set `SERVER_URL` to your computer's LAN IP and port
-`8000`, and set your `OPENAI_API_KEY`.
+In `Mobile_Application/.env`, set `SERVER_URL` to your computer's LAN IP + port
+`8000`, and set `OPENAI_API_KEY`.
 
 ### 3. Build & run the app
 
@@ -183,17 +213,23 @@ export ANDROID_HOME="$HOME/Library/Android/sdk"   # or set sdk.dir in local.prop
 ./gradlew installDebug           # build + install on a connected device/emulator
 ```
 
-Or open `Mobile_Application/` in Android Studio and press **Run**. Launcher
-entry point: the `Intro` activity.
+Or open `Mobile_Application/` in Android Studio and press **Run**. Launcher entry
+point: the `Intro` activity.
 
 ### 4. Use it
 
-Record a command → on the **Confirm request** screen the transcript appears →
-tap **Send request** → the clip + transcript show up in the desktop GUI, where
-you can press **Play**.
+* **Speech only:** Menu → *Speech command* → record → on **Confirm request** the
+  transcript appears → **Send request**.
+* **Speech + image:** Menu → *Speech with image* → frame & **Capture** (flip
+  front/back as needed) → **Proceed** → the **Analyzing image** screen shows the
+  GPT obstacle description → **Add speech** → record → **Send request**.
 
-> Tip: send **after** the transcript appears on the phone. Tapping "Send" while
-> it still says "Transcribing…" uploads an empty transcript.
+The report (audio, transcript, photo, description, mode) appears in the desktop
+GUI, where you can read it, preview the photo, and **Play** the audio.
+
+> The app **blocks Send / Add speech until the OpenAI response returns** and shows
+> a quick "Please wait — still processing…" toast if you tap early, so empty data
+> is never uploaded.
 
 ---
 
@@ -207,20 +243,24 @@ you can press **Play**.
 |-----|--------|---------|---------|
 | `http://<pc-ip>:8000/` | GET | you (browser) | "server is running ✅" status page |
 | `http://<pc-ip>:8000/health` | GET | you (browser) | JSON `{"status":"ok"}` |
-| `http://<pc-ip>:8000/upload` | POST | **the phone** | multipart `audio` file + `transcript` text |
+| `http://<pc-ip>:8000/upload` | POST | **the phone** | multipart: `audio` (file), `transcript`, `mode`, and in image mode `image` (file) + `description` |
 
-Uploads are saved to `Computer_Receiver/received/` as `clip_<timestamp>.mp4`
-plus a matching `clip_<timestamp>.txt` transcript (folder is gitignored).
+Each report is saved under `Computer_Receiver/received/` (gitignored) as
+`clip_<timestamp>.mp4` (audio), `clip_<timestamp>.jpg` (photo, image mode),
+`clip_<timestamp>.txt` (transcript), and `clip_<timestamp>_description.txt`.
 
-**B) Desktop GUI (Tkinter)** — the window that opens on your screen:
+**B) Desktop GUI (Tkinter)** — a clean, card-based window:
 
-* a list of received clips (newest auto-selected),
-* a transcript pane for the selected clip,
-* **Play / Stop** buttons for the selected clip's audio,
-* a live status line and the listening URL in the title bar.
+* a **Reports** list (mode icon 🎤 / 🖼 + time, newest auto-selected, count badge);
+* a **mode badge** ("SPEECH" / "SPEECH + IMAGE");
+* the **spoken report** (transcript) and **image description** (JSON);
+* a **photo preview** (Pillow, EXIF-corrected so it isn't rotated/flipped);
+* **Play / Stop** audio, and **Open image** (hidden for speech-only reports);
+* a header that shows "● Server running" + the listening URL, plus a status line.
 
-The server runs in a background thread; the GUI polls shared state every ~0.8s
-so new clips appear automatically.
+The server runs in a background thread; the GUI polls shared state every ~0.8s so
+new reports appear automatically. Pillow is optional — without it the preview is
+replaced by a hint and the **Open image** button.
 
 ---
 
@@ -234,9 +274,10 @@ so new clips appear automatically.
 | UI | Android XML layouts + `ConstraintLayout` (no Jetpack Compose) |
 | Components | Material Components (`com.google.android.material:material`) |
 | Camera | CameraX (`androidx.camera:*`), front/back switching |
-| Audio | `android.media.MediaRecorder` / `MediaPlayer` |
+| Audio | `android.media.MediaRecorder` (AAC) / `MediaPlayer` |
 | Networking | OkHttp (`com.squareup.okhttp3:okhttp`) |
 | Transcription | OpenAI (`gpt-4o-mini-transcribe` by default; set in `config.properties`) |
+| Vision / description | OpenAI (`gpt-5` by default; set in `config.properties`) |
 | Min / Target SDK | 24 / 34 |
 | Package | `com.example.slam_hri_mobile_application` |
 
@@ -247,38 +288,46 @@ Each screen is a single `AppCompatActivity` with one matching layout in
 
 | Class | Layout | What it does |
 |-------|--------|--------------|
-| `Intro` | `activity_intro.xml` | Splash: logo, title, loading spinner for ~3s, then opens `Menu`. Launcher activity. |
+| `Intro` | `activity_intro.xml` | Splash: logo, title, spinner for ~3s, then opens `Menu`. Launcher activity. |
 | `Menu` | `activity_menu.xml` | Two choices: **Speech command** (→ `SpeechRequest`) or **Speech with image** (→ `CamImg`). |
-| `SpeechRequest` | `activity_speech_request.xml` | Records audio. Shows a live **recording animation** (radar pulse + blinking dot + timer) while recording. Saves the clip and opens `SpeechConfirm`. |
-| `SpeechConfirm` | `activity_speech_confirm.xml` | **Plays** the clip (with playback animation), **auto-transcribes** it via OpenAI and shows the transcript, and on **Send request** **uploads** audio + transcript to the desktop receiver. |
-| `CamImg` | `activity_cam_img.xml` | CameraX preview with a **flip button** to switch front/back cameras. Captures a photo and opens `ImageReview`. |
-| `ImageReview` | `activity_image_review.xml` | Shows the just-captured photo (downsampled + EXIF-rotated). "Add speech" → `SpeechRequest`; "Retake" → `CamImg`. |
+| `SpeechRequest` | `activity_speech_request.xml` | Records audio (AAC) with a live **recording animation** (radar pulse + blinking dot + timer). Forwards any image path/description, then opens `SpeechConfirm`. |
+| `SpeechConfirm` | `activity_speech_confirm.xml` | **Plays** the clip (playback animation), **auto-transcribes** via OpenAI, shows the transcript, and **Send request** uploads everything. Send is blocked (with a toast) until transcription returns. |
+| `CamImg` | `activity_cam_img.xml` | CameraX preview with a **flip button** (front/back). Captures a photo (overwrites one file) and opens `ImageReview`. |
+| `ImageReview` | `activity_image_review.xml` | Shows the captured photo (downsampled + EXIF-rotated). **Proceed** → `ImageAnalysis`; **Retake** → `CamImg`. |
+| `ImageAnalysis` | `activity_image_analysis.xml` | **Analyzing image** screen: animated scan line + spinner while OpenAI describes the photo (JSON), shows the result, then **Add speech** (blocked with a toast until the result returns) → `SpeechRequest`. |
 
 Helper classes:
 
-* **`OpenAiClient`** — multipart POST of the audio to OpenAI's transcription
-  endpoint using `BuildConfig.OPENAI_API_KEY`; returns the transcript text.
-* **`ServerUploader`** — multipart POST of the audio + transcript to
-  `BuildConfig.SERVER_URL` + `/upload`.
+* **`OpenAiClient`** — multipart POST of the audio to OpenAI transcription
+  (`BuildConfig.TRANSCRIPTION_MODEL`, optional `TRANSCRIPTION_PROMPT`); returns text.
+* **`OpenAiVision`** — base64 image → OpenAI chat completions
+  (`BuildConfig.VISION_MODEL`, `VISION_SYSTEM_PROMPT`/`VISION_USER_PROMPT`,
+  `response_format: json_object`); returns a JSON obstacle description.
+* **`ServerUploader`** — multipart POST of `audio + transcript + mode + image +
+  description` to `BuildConfig.SERVER_URL` + `/upload`.
 
 ### Navigation flow
 
 ```
 Intro ──(3s)──▶ Menu
-                 ├─ "Speech command" ───────▶ SpeechRequest ──▶ SpeechConfirm ──▶ Menu
-                 │                                 ▲                  │   (transcribe +
-                 │                                 └──── "Re-record" ─┘    upload here)
-                 └─ "Speech with image" ─▶ CamImg ──▶ ImageReview ──▶ SpeechRequest ...
-                                              ▲            │
-                                              └─ "Retake" ─┘
+   ├─ "Speech command" ─────────────▶ SpeechRequest ─▶ SpeechConfirm ─▶ Menu
+   │                                       ▲                 │  (transcribe + upload)
+   │                                       └─── "Re-record" ─┘
+   └─ "Speech with image" ─▶ CamImg ─▶ ImageReview ─(Proceed)▶ ImageAnalysis ─(Add speech)▶ SpeechRequest ─▶ SpeechConfirm
+                                ▲            │  (describe photo via OpenAI here)
+                                └─ "Retake" ─┘
 ```
 
 ### Audio & image handling notes
 
-* Audio is recorded to `getFilesDir()/slam_hri_request_sample_1.mp4`.
+* Audio is recorded as **AAC** (44.1 kHz / 128 kbps) to
+  `getFilesDir()/slam_hri_request_sample_1.mp4` — a universally playable file
+  (earlier AMR output couldn't be played by macOS `afplay`).
 * Photos are captured to a single app file (`getFilesDir()/captured_image.jpg`)
-  that is **overwritten each time**, so the review screen always shows the photo
-  you just took (this fixed an earlier stale-image bug).
+  that is **overwritten each time**, so the review/analysis screens always show
+  the photo you just took.
+* The image description is generated **once** on `ImageAnalysis` and carried
+  forward to the upload (the confirm screen does not re-run vision).
 
 ### Resources & design system
 
@@ -287,8 +336,8 @@ Intro ──(3s)──▶ Menu
 | `res/values/colors.xml` / `res/values-night/colors.xml` | Semantic palette (brand, accent, danger, surfaces, text) + dark variant. |
 | `res/values/themes.xml` / `res/values-night/themes.xml` | Material theme, gradient window background, status/nav bar colors, text/button styles. |
 | `res/values/dimens.xml` | Spacing, sizing, corner-radius, typography tokens. |
-| `res/values/strings.xml` | All UI copy, transcription/upload status text, accessibility descriptions. |
-| `res/drawable/` | Vector icons, gradient backgrounds, circular button + pulse-ring backgrounds, launcher icon. |
+| `res/values/strings.xml` | All UI copy, transcription/vision/upload status text, accessibility descriptions. |
+| `res/drawable/` | Vector icons, gradient backgrounds, circular button + pulse/scan-ring backgrounds, launcher icon. |
 
 **Accessibility (for BVI users):** large touch targets, high-contrast colors,
 full dark-mode support, spoken-state announcements, and `contentDescription`s on
@@ -297,9 +346,9 @@ interactive elements.
 ### Permissions (`AndroidManifest.xml`)
 
 `INTERNET`, `ACCESS_WIFI_STATE`, `ACCESS_NETWORK_STATE`,
-`READ/WRITE_EXTERNAL_STORAGE`, `CAMERA`, `RECORD_AUDIO`. Camera and microphone
-are requested at runtime. `usesCleartextTraffic="true"` is set so the phone can
-reach the local `http://` receiver.
+`READ/WRITE_EXTERNAL_STORAGE`, `CAMERA`, `RECORD_AUDIO`. Camera and microphone are
+requested at runtime. `usesCleartextTraffic="true"` is set so the phone can reach
+the local `http://` receiver.
 
 ---
 
@@ -308,25 +357,32 @@ reach the local `http://` receiver.
 * **Phone can't reach the computer** — confirm both are on the same Wi-Fi, that
   `SERVER_URL` matches the IP printed by `receiver.py`, and that your firewall
   allows incoming connections on port 8000 (macOS may prompt the first time).
-* **`ModuleNotFoundError: No module named '_tkinter'`** — your Python lacks Tk
-  support (common with Homebrew's Python). `auto_deploy.sh` auto-selects a
-  Tk-capable Python; if you run manually, use Anaconda/python.org Python, or on
-  macOS install Tk for Homebrew Python with `brew install python-tk`.
-* **`GET /` shows 404** — you're on an old server build; restart `receiver.py`
-  (the status page route was added). `/upload` and `/health` always exist.
-* **Transcript empty on the desktop** — you likely tapped **Send** before
-  transcription finished. Wait for the transcript to appear on the phone first.
-* **No transcript on the phone** — make sure `OPENAI_API_KEY` is set in `.env`
-  and you rebuilt the app.
+* **`ModuleNotFoundError: No module named '_tkinter'`** — your Python lacks Tk.
+  `auto_deploy.sh` auto-selects a Tk-capable Python; if running manually, use
+  Anaconda/python.org Python, or `brew install python-tk` for Homebrew Python.
+* **"Could not preview image" in the GUI** — install Pillow
+  (`pip install -r requirements.txt`); the console prints the exact reason. The
+  GUI tolerates slightly truncated uploads.
+* **Photo looks rotated/flipped** — fixed: the GUI applies EXIF orientation. If a
+  front-camera shot still looks mirrored, that's a capture-side mirror, not EXIF.
+* **No transcript / description** — make sure `OPENAI_API_KEY` is set in `.env`
+  and rebuild. A vision failure is shown inline (e.g. an HTTP error); if it
+  mentions the model, switch `VISION_MODEL` to `gpt-4o` in `config.properties`.
+* **Empty data on the desktop** — shouldn't happen now: Send / Add speech are
+  blocked until the OpenAI response returns (with a "please wait" toast).
+* **`GET /` shows 404** — old server build; restart `receiver.py`.
 * **Computer's IP changed** — update `SERVER_URL` in `.env` and rebuild.
 
 ---
 
 ## Known limitations / next steps
 
-* **API key in the APK** (Option A design) — acceptable for a private prototype;
-  for production, proxy OpenAI through a server so the key never ships.
+* **API key in the APK** (phone calls OpenAI directly) — fine for a private
+  prototype; for production, proxy OpenAI through a server so the key never ships.
 * **Audio recording on older devices** — `MediaRecorder` is only constructed on
   API 31+, so recording will not work below that despite `minSdk 24`.
-* **No robot integration yet** — the receiver currently just displays data; the
-  SLAM/HRI backend and command streaming to the robot are future work.
+* **Vision latency** — `gpt-5` is slower than `gpt-4o`; sending full-resolution
+  photos also adds time. Switch `VISION_MODEL` and/or downscale before sending to
+  speed it up.
+* **No robot integration yet** — the receiver currently just collects/displays
+  reports; the SLAM/HRI backend and command streaming to the robot are future work.
