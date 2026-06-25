@@ -1,13 +1,15 @@
 """
 Desktop receiver for the BVI Mutual HRI SLAM mobile app.
 
-Runs a small HTTP server that the phone uploads to (audio clip + transcript),
-and a simple Tkinter GUI to browse received clips, read the transcript, and
-play the audio.
+Runs a small HTTP server that the phone uploads to (mode, audio clip, transcript,
+and — in image mode — the photo plus a GPT-5 description), and a Tkinter GUI to
+browse received clips, read the transcript and description, preview the image,
+and play the audio.
 
 Flow:
-    phone records -> phone transcribes via OpenAI -> phone POSTs the audio
-    + transcript here -> this GUI shows the transcript and plays the audio.
+    phone records -> transcribes via OpenAI (and, in image mode, describes the
+    photo with GPT-5) -> POSTs everything here -> this GUI shows the mode,
+    transcript, image + description, and plays the audio.
 
 Run:
     pip install -r requirements.txt
@@ -29,12 +31,21 @@ from flask import Flask, request, jsonify
 import tkinter as tk
 from tkinter import ttk, scrolledtext
 
+# Pillow is optional: if present we show inline image previews; if not, the GUI
+# still works and offers an "Open image" button instead.
+try:
+    from PIL import Image, ImageTk
+    HAVE_PIL = True
+except Exception:
+    HAVE_PIL = False
+
 PORT = 8000
 SAVE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "received")
 os.makedirs(SAVE_DIR, exist_ok=True)
 
 # Shared state between the server thread and the GUI thread.
-records = []          # list of dicts: {"time", "audio", "transcript"}
+# Each record: {"time", "mode", "audio", "image", "transcript", "description"}
+records = []
 records_lock = threading.Lock()
 
 
@@ -67,7 +78,10 @@ def health():
 @app.route("/upload", methods=["POST"])
 def upload():
     transcript = request.form.get("transcript", "")
+    description = request.form.get("description", "")
+    mode = request.form.get("mode", "") or "speech"
     audio = request.files.get("audio")
+    image = request.files.get("image")
 
     ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -77,16 +91,36 @@ def upload():
         audio_path = os.path.join(SAVE_DIR, f"clip_{stamp}.mp4")
         audio.save(audio_path)
 
-    # Keep a sidecar text file too, so the data survives a restart.
+    image_path = ""
+    if image is not None:
+        image_path = os.path.join(SAVE_DIR, f"clip_{stamp}.jpg")
+        image.save(image_path)
+
+    # Keep sidecar text files too, so the data survives a restart.
     with open(os.path.join(SAVE_DIR, f"clip_{stamp}.txt"), "w", encoding="utf-8") as fh:
         fh.write(transcript)
+    if description:
+        with open(os.path.join(SAVE_DIR, f"clip_{stamp}_description.txt"), "w", encoding="utf-8") as fh:
+            fh.write(description)
 
-    record = {"time": ts, "audio": audio_path, "transcript": transcript}
+    record = {
+        "time": ts,
+        "mode": mode,
+        "audio": audio_path,
+        "image": image_path,
+        "transcript": transcript,
+        "description": description,
+    }
     with records_lock:
         records.append(record)
 
-    preview = transcript[:80].replace("\n", " ")
-    print(f"[received] {ts}  transcript: {preview!r}  audio: {os.path.basename(audio_path)}")
+    preview = transcript[:60].replace("\n", " ")
+    print(
+        f"[received] {ts}  mode: {mode}  transcript: {preview!r}  "
+        f"audio: {os.path.basename(audio_path)}  "
+        f"image: {os.path.basename(image_path) if image_path else '-'}  "
+        f"description: {len(description)} chars"
+    )
 
     return jsonify({"status": "ok"})
 
@@ -118,10 +152,11 @@ class ReceiverGui:
         self.play_proc = None
         self.shown_count = 0
         self.selected_index = None
+        self.thumb_img = None  # keep a ref so Tk doesn't GC the preview
 
         root.title("HRI SLAM - Transcription Receiver")
-        root.geometry("820x520")
-        root.minsize(680, 420)
+        root.geometry("960x680")
+        root.minsize(760, 540)
 
         # App icon (kept as attributes so Tk doesn't garbage-collect them).
         icon_path = os.path.join(
@@ -159,28 +194,43 @@ class ReceiverGui:
 
         ttk.Label(left, text="Received clips").pack(side=tk.TOP, anchor="w")
         self.listbox = tk.Listbox(
-            left, width=28, activestyle="dotbox", exportselection=False
+            left, width=30, activestyle="dotbox", exportselection=False
         )
         self.listbox.pack(side=tk.TOP, fill=tk.Y, expand=True, pady=(4, 0))
         self.listbox.bind("<<ListboxSelect>>", self.on_select)
 
-        # Right: transcript + controls
+        # Right: details (mode, transcript, description, image, controls)
         right = ttk.Frame(body)
         right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(12, 0))
 
-        ttk.Label(right, text="Transcript").pack(side=tk.TOP, anchor="w")
-        self.transcript_box = scrolledtext.ScrolledText(
-            right, wrap=tk.WORD, font=("Helvetica", 14)
-        )
-        self.transcript_box.pack(side=tk.TOP, fill=tk.BOTH, expand=True, pady=(4, 8))
+        self.mode_label = ttk.Label(right, text="Mode: -", font=("Helvetica", 13, "bold"))
+        self.mode_label.pack(side=tk.TOP, anchor="w")
 
+        # Audio controls
         controls = ttk.Frame(right)
-        controls.pack(side=tk.TOP, fill=tk.X)
-
-        self.play_btn = ttk.Button(controls, text="Play audio", command=self.play_audio)
+        controls.pack(side=tk.TOP, fill=tk.X, pady=(6, 8))
+        self.play_btn = ttk.Button(controls, text="▶ Play audio", command=self.play_audio)
         self.play_btn.pack(side=tk.LEFT)
-        self.stop_btn = ttk.Button(controls, text="Stop", command=self.stop_audio)
+        self.stop_btn = ttk.Button(controls, text="■ Stop", command=self.stop_audio)
         self.stop_btn.pack(side=tk.LEFT, padx=(8, 0))
+        self.open_img_btn = ttk.Button(controls, text="Open image", command=self.open_image)
+        self.open_img_btn.pack(side=tk.LEFT, padx=(8, 0))
+
+        ttk.Label(right, text="Transcript (spoken report)").pack(side=tk.TOP, anchor="w")
+        self.transcript_box = scrolledtext.ScrolledText(
+            right, wrap=tk.WORD, font=("Helvetica", 13), height=6
+        )
+        self.transcript_box.pack(side=tk.TOP, fill=tk.X, pady=(4, 8))
+
+        ttk.Label(right, text="Image description (GPT-5)").pack(side=tk.TOP, anchor="w")
+        self.description_box = scrolledtext.ScrolledText(
+            right, wrap=tk.WORD, font=("Helvetica", 13), height=8
+        )
+        self.description_box.pack(side=tk.TOP, fill=tk.BOTH, expand=True, pady=(4, 8))
+
+        # Image preview (only populated when Pillow is available and a photo exists)
+        self.image_label = ttk.Label(right)
+        self.image_label.pack(side=tk.TOP, anchor="w")
 
         self.status = ttk.Label(root, text="Waiting for the phone to send a clip\u2026")
         self.status.pack(side=tk.BOTTOM, fill=tk.X, padx=12, pady=(0, 10))
@@ -191,7 +241,7 @@ class ReceiverGui:
         """Poll shared state and update the listbox when new clips arrive."""
         with records_lock:
             count = len(records)
-            items = [r["time"] for r in records]
+            items = [f"{r['time']}  ·  {r.get('mode', 'speech')}" for r in records]
 
         if count != self.shown_count:
             self.listbox.delete(0, tk.END)
@@ -214,15 +264,70 @@ class ReceiverGui:
             self.display(sel[0])
 
     def display(self, idx):
-        """Show the transcript for the record at idx (does not rely on
-        Listbox selection state, which Tkinter can clear unexpectedly)."""
+        """Show all fields for the record at idx (does not rely on Listbox
+        selection state, which Tkinter can clear unexpectedly)."""
         with records_lock:
             rec = records[idx] if 0 <= idx < len(records) else None
         self.selected_index = idx
+
         self.transcript_box.delete("1.0", tk.END)
-        if rec:
-            text = rec["transcript"] or "(no transcript)"
-            self.transcript_box.insert(tk.END, text)
+        self.description_box.delete("1.0", tk.END)
+        self.image_label.config(image="", text="")
+        self.thumb_img = None
+
+        if not rec:
+            self.mode_label.config(text="Mode: -")
+            return
+
+        mode = rec.get("mode", "speech")
+        self.mode_label.config(text=f"Mode: {mode}")
+
+        self.transcript_box.insert(tk.END, rec.get("transcript") or "(no transcript)")
+
+        has_image = bool(rec.get("image")) and os.path.exists(rec.get("image"))
+        if not has_image:
+            self.description_box.insert(tk.END, "(speech only — no image)")
+        else:
+            self.description_box.insert(
+                tk.END, rec.get("description") or "(no description)"
+            )
+            self.show_thumbnail(rec["image"])
+
+    def show_thumbnail(self, image_path):
+        """Render an inline preview if Pillow is available; otherwise hint to
+        use the Open image button."""
+        if not HAVE_PIL:
+            self.image_label.config(
+                text="(install Pillow to preview images here — or use 'Open image')"
+            )
+            return
+        try:
+            img = Image.open(image_path)
+            img.thumbnail((360, 360))
+            self.thumb_img = ImageTk.PhotoImage(img)
+            self.image_label.config(image=self.thumb_img, text="")
+        except Exception:
+            self.image_label.config(text="(could not preview image)")
+
+    def open_image(self):
+        idx = self.selected_index
+        with records_lock:
+            rec = records[idx] if (idx is not None and 0 <= idx < len(records)) else None
+        if not rec or not rec.get("image") or not os.path.exists(rec.get("image")):
+            self.status.config(text="No image for this clip")
+            return
+        path = rec["image"]
+        system = platform.system()
+        try:
+            if system == "Darwin":
+                subprocess.Popen(["open", path])
+            elif system == "Windows":
+                os.startfile(path)  # type: ignore[attr-defined]
+            else:
+                subprocess.Popen(["xdg-open", path])
+            self.status.config(text=f"Opened {os.path.basename(path)}")
+        except Exception:
+            self.status.config(text="Could not open the image")
 
     def play_audio(self):
         idx = self.selected_index
