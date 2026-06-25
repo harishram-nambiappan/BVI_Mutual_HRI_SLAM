@@ -14,6 +14,7 @@ import android.text.TextUtils;
 import android.view.View;
 import android.view.animation.AccelerateDecelerateInterpolator;
 import android.widget.ImageView;
+import android.widget.Toast;
 
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
@@ -36,6 +37,7 @@ public class ImageAnalysis extends AppCompatActivity {
     String imagePath;
     File imageFile;
     String description = "";
+    volatile boolean analysisDone = false;
     ObjectAnimator scanAnimator;
 
     @Override
@@ -75,6 +77,11 @@ public class ImageAnalysis extends AppCompatActivity {
         addSpeechBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                if (!analysisDone) {
+                    Toast.makeText(getApplicationContext(), R.string.please_wait_processing,
+                            Toast.LENGTH_SHORT).show();
+                    return;
+                }
                 Intent speech_intent = new Intent(getApplicationContext(), SpeechRequest.class);
                 speech_intent.putExtra("image_path", imagePath);
                 speech_intent.putExtra("description", description);
@@ -94,7 +101,7 @@ public class ImageAnalysis extends AppCompatActivity {
     }
 
     private void startAnalysis() {
-        addSpeechBtn.setEnabled(false);
+        analysisDone = false;
         analysisProgress.setVisibility(View.VISIBLE);
         analysisText.setText(R.string.analyzing);
         startScanAnimation();
@@ -130,7 +137,7 @@ public class ImageAnalysis extends AppCompatActivity {
                     analysisText.setText(result);
                 }
                 // Allow the user to continue regardless (they can still add speech).
-                addSpeechBtn.setEnabled(true);
+                analysisDone = true;
             }
         });
     }

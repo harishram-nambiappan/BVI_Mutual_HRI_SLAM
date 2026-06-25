@@ -37,6 +37,7 @@ public class SpeechConfirm extends AppCompatActivity {
     TextView transcriptText;
     CircularProgressIndicator transcriptProgress;
     String lastTranscript = "";
+    volatile boolean transcriptionDone = false;
 
     File audioFile;
 
@@ -128,6 +129,13 @@ public class SpeechConfirm extends AppCompatActivity {
     }
 
     private void sendToServer() {
+        // Wait for the transcription (and, in image mode, the description that was
+        // computed on the analysis screen) before allowing a send.
+        if (!transcriptionDone) {
+            Toast.makeText(getApplicationContext(), R.string.please_wait_processing, Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         Toast.makeText(getApplicationContext(), R.string.sending, Toast.LENGTH_SHORT).show();
         send_speech.setEnabled(false);
 
@@ -164,9 +172,7 @@ public class SpeechConfirm extends AppCompatActivity {
     private void startTranscription() {
         transcriptProgress.setVisibility(View.VISIBLE);
         transcriptText.setText(R.string.transcribing);
-        // Block sending until the transcript (and, for image mode, the
-        // already-computed description) are ready, so we never upload empties.
-        send_speech.setEnabled(false);
+        transcriptionDone = false;
 
         OpenAiClient.transcribe(audioFile, new OpenAiClient.TranscriptionCallback() {
             @Override
@@ -182,7 +188,7 @@ public class SpeechConfirm extends AppCompatActivity {
                             lastTranscript = transcript;
                             transcriptText.setText(transcript);
                         }
-                        send_speech.setEnabled(true);
+                        transcriptionDone = true;
                     }
                 });
             }
@@ -203,7 +209,7 @@ public class SpeechConfirm extends AppCompatActivity {
                         }
                         // Allow sending even if transcription failed (so the
                         // audio/image still reach the desktop); retry via the card.
-                        send_speech.setEnabled(true);
+                        transcriptionDone = true;
                     }
                 });
             }

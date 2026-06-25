@@ -136,7 +136,6 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginBottom="@dimen/space_m"
-        android:enabled="false"
         android:text="@string/add_speech"
         app:icon="@drawable/ic_mic"
         app:layout_constraintBottom_toTopOf="@+id/retakeBtn"
