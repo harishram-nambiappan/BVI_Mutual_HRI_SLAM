@@ -36,6 +36,7 @@
     <string name="transcript_no_recording">No recording found.</string>
     <string name="transcript_empty">No speech detected.</string>
     <string name="sending">Sending to computer\u2026</string>
+    <string name="waiting_description">Finishing image description\u2026</string>
     <string name="sent_ok">Sent to computer</string>
     <string name="send_no_url">No server URL set in .env</string>
     <string name="send_failed">Couldn\'t reach the computer. Check Wi-Fi and SERVER_URL.</string>
