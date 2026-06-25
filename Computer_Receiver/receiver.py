@@ -61,7 +61,7 @@ def index():
         count = len(records)
     return (
         "<html><body style='font-family:sans-serif;padding:24px'>"
-        "<h2>HRI SLAM Transcription Receiver</h2>"
+        "<h2>HRI SLAM Computer Receiver</h2>"
         "<p>The server is running and reachable. ✅</p>"
         f"<p>Clips received so far: <b>{count}</b></p>"
         "<p>The phone uploads to <code>POST /upload</code>. "
@@ -146,6 +146,23 @@ def local_ip():
 # ---------------------------------------------------------------------------
 # GUI (runs on the main thread)
 # ---------------------------------------------------------------------------
+# Brand palette (matches the mobile app).
+BG = "#EEF0F8"
+CARD = "#FFFFFF"
+PRIMARY = "#6C5CE7"
+PRIMARY_DK = "#4B3FCB"
+PRIMARY_TINT = "#E7E3FF"
+ACCENT = "#00BFA6"
+ACCENT_DK = "#00A38D"
+TEXT = "#1B1C2E"
+MUTED = "#6A6E8A"
+BORDER = "#E2E4F0"
+FIELD_BG = "#F6F7FD"
+
+FONT = "Helvetica"
+MONO = "Menlo"
+
+
 class ReceiverGui:
     def __init__(self, root):
         self.root = root
@@ -155,10 +172,46 @@ class ReceiverGui:
         self.thumb_img = None  # keep a ref so Tk doesn't GC the preview
 
         root.title("HRI SLAM - Transcription Receiver")
-        root.geometry("960x680")
-        root.minsize(760, 540)
+        root.geometry("1040x720")
+        root.minsize(860, 600)
+        root.configure(bg=BG)
 
-        # App icon (kept as attributes so Tk doesn't garbage-collect them).
+        self._setup_styles()
+        self._load_icon()
+        self._build_header()
+        self._build_body()
+
+        self.refresh()
+
+    # ---- setup helpers ----------------------------------------------------
+    def _setup_styles(self):
+        style = ttk.Style()
+        try:
+            style.theme_use("clam")
+        except tk.TclError:
+            pass
+        style.configure(
+            "Primary.TButton", background=PRIMARY, foreground="white",
+            font=(FONT, 11, "bold"), borderwidth=0, focuscolor=PRIMARY,
+            padding=(16, 9),
+        )
+        style.map("Primary.TButton",
+                  background=[("active", PRIMARY_DK), ("disabled", "#C7C9DA")])
+        style.configure(
+            "Accent.TButton", background=ACCENT, foreground="white",
+            font=(FONT, 11, "bold"), borderwidth=0, focuscolor=ACCENT,
+            padding=(16, 9),
+        )
+        style.map("Accent.TButton",
+                  background=[("active", ACCENT_DK), ("disabled", "#BFE7E0")])
+        style.configure(
+            "Ghost.TButton", background=CARD, foreground=TEXT,
+            font=(FONT, 11), borderwidth=1, bordercolor=BORDER,
+            focuscolor=CARD, padding=(16, 9),
+        )
+        style.map("Ghost.TButton", background=[("active", FIELD_BG)])
+
+    def _load_icon(self):
         icon_path = os.path.join(
             os.path.dirname(os.path.abspath(__file__)), "receiver_icon.png"
         )
@@ -167,96 +220,164 @@ class ReceiverGui:
         if os.path.exists(icon_path):
             try:
                 self.icon_img = tk.PhotoImage(file=icon_path)
-                root.iconphoto(True, self.icon_img)
-                # Smaller copy for the header (256px -> ~52px).
-                self.icon_small = self.icon_img.subsample(5, 5)
+                self.root.iconphoto(True, self.icon_img)
+                self.icon_small = self.icon_img.subsample(6, 6)  # ~42px
             except Exception:
                 self.icon_img = None
                 self.icon_small = None
 
+    def _card(self, parent):
+        return tk.Frame(parent, bg=CARD, highlightbackground=BORDER,
+                        highlightthickness=1, bd=0)
+
+    def _build_header(self):
         url = f"http://{local_ip()}:{PORT}"
-        header = ttk.Frame(root)
-        header.pack(side=tk.TOP, fill=tk.X, padx=12, pady=(12, 6))
+        header = self._card(self.root)
+        header.pack(side=tk.TOP, fill=tk.X, padx=16, pady=(16, 8))
+        inner = tk.Frame(header, bg=CARD)
+        inner.pack(fill=tk.X, padx=16, pady=14)
+
         if self.icon_small is not None:
-            ttk.Label(header, image=self.icon_small).pack(side=tk.LEFT, padx=(0, 10))
-        ttk.Label(
-            header,
-            text=f"Listening on {url}   (set this as SERVER_URL on the phone)",
-            font=("Helvetica", 12, "bold"),
-        ).pack(side=tk.LEFT, anchor="w")
+            tk.Label(inner, image=self.icon_small, bg=CARD).pack(side=tk.LEFT, padx=(0, 14))
 
-        body = ttk.Frame(root)
-        body.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=12, pady=6)
+        titles = tk.Frame(inner, bg=CARD)
+        titles.pack(side=tk.LEFT, anchor="w")
+        tk.Label(titles, text="HRI SLAM Receiver", bg=CARD, fg=TEXT,
+                 font=(FONT, 17, "bold")).pack(anchor="w")
+        tk.Label(titles, text=f"Server running at {url}  ·  set this as SERVER_URL on the phone",
+                 bg=CARD, fg=MUTED, font=(FONT, 11)).pack(anchor="w", pady=(2, 0))
 
-        # Left: list of received clips
-        left = ttk.Frame(body)
-        left.pack(side=tk.LEFT, fill=tk.Y)
+        tk.Label(inner, text="● Server running", bg=CARD, fg=ACCENT_DK,
+                 font=(FONT, 11, "bold")).pack(side=tk.RIGHT)
 
-        ttk.Label(left, text="Received clips").pack(side=tk.TOP, anchor="w")
+    def _build_body(self):
+        body = tk.Frame(self.root, bg=BG)
+        body.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=16, pady=(0, 8))
+        body.grid_columnconfigure(0, weight=0, minsize=250)
+        body.grid_columnconfigure(1, weight=1)
+        body.grid_rowconfigure(0, weight=1)
+
+        # ----- Left: reports list -----
+        left = self._card(body)
+        left.grid(row=0, column=0, sticky="nsew", padx=(0, 12))
+        left_in = tk.Frame(left, bg=CARD)
+        left_in.pack(fill=tk.BOTH, expand=True, padx=12, pady=12)
+
+        head = tk.Frame(left_in, bg=CARD)
+        head.pack(fill=tk.X)
+        tk.Label(head, text="REPORTS", bg=CARD, fg=MUTED,
+                 font=(FONT, 10, "bold")).pack(side=tk.LEFT)
+        self.count_label = tk.Label(head, text="0", bg=PRIMARY_TINT, fg=PRIMARY_DK,
+                                    font=(FONT, 10, "bold"), padx=8)
+        self.count_label.pack(side=tk.RIGHT)
+
         self.listbox = tk.Listbox(
-            left, width=30, activestyle="dotbox", exportselection=False
+            left_in, activestyle="none", exportselection=False,
+            bg=CARD, fg=TEXT, font=(FONT, 12), bd=0, highlightthickness=0,
+            selectbackground=PRIMARY_TINT, selectforeground=PRIMARY_DK,
+            width=24,
         )
-        self.listbox.pack(side=tk.TOP, fill=tk.Y, expand=True, pady=(4, 0))
+        self.listbox.pack(fill=tk.BOTH, expand=True, pady=(10, 0))
         self.listbox.bind("<<ListboxSelect>>", self.on_select)
 
-        # Right: details (mode, transcript, description, image, controls)
-        right = ttk.Frame(body)
-        right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(12, 0))
+        # ----- Right: detail -----
+        right = self._card(body)
+        right.grid(row=0, column=1, sticky="nsew")
+        right_in = tk.Frame(right, bg=CARD)
+        right_in.pack(fill=tk.BOTH, expand=True, padx=16, pady=16)
 
-        self.mode_label = ttk.Label(right, text="Mode: -", font=("Helvetica", 13, "bold"))
-        self.mode_label.pack(side=tk.TOP, anchor="w")
+        # Top bar: mode badge + controls
+        topbar = tk.Frame(right_in, bg=CARD)
+        topbar.pack(fill=tk.X)
+        self.mode_badge = tk.Label(topbar, text="—", bg=PRIMARY_TINT, fg=PRIMARY_DK,
+                                   font=(FONT, 11, "bold"), padx=12, pady=5)
+        self.mode_badge.pack(side=tk.LEFT)
 
-        # Audio controls
-        controls = ttk.Frame(right)
-        controls.pack(side=tk.TOP, fill=tk.X, pady=(6, 8))
-        self.play_btn = ttk.Button(controls, text="▶ Play audio", command=self.play_audio)
+        btns = tk.Frame(topbar, bg=CARD)
+        btns.pack(side=tk.RIGHT)
+        self.play_btn = ttk.Button(btns, text="▶  Play", style="Accent.TButton",
+                                   command=self.play_audio)
         self.play_btn.pack(side=tk.LEFT)
-        self.stop_btn = ttk.Button(controls, text="■ Stop", command=self.stop_audio)
+        self.stop_btn = ttk.Button(btns, text="■  Stop", style="Ghost.TButton",
+                                   command=self.stop_audio)
         self.stop_btn.pack(side=tk.LEFT, padx=(8, 0))
-        self.open_img_btn = ttk.Button(controls, text="Open image", command=self.open_image)
+        self.open_img_btn = ttk.Button(btns, text="Open image", style="Ghost.TButton",
+                                       command=self.open_image)
         self.open_img_btn.pack(side=tk.LEFT, padx=(8, 0))
 
-        ttk.Label(right, text="Transcript (spoken report)").pack(side=tk.TOP, anchor="w")
-        self.transcript_box = scrolledtext.ScrolledText(
-            right, wrap=tk.WORD, font=("Helvetica", 13), height=6
+        # Content: text column + image column
+        content = tk.Frame(right_in, bg=CARD)
+        content.pack(fill=tk.BOTH, expand=True, pady=(14, 0))
+        content.grid_columnconfigure(0, weight=1)
+        content.grid_columnconfigure(1, weight=0, minsize=280)
+        content.grid_rowconfigure(0, weight=1)
+
+        textcol = tk.Frame(content, bg=CARD)
+        textcol.grid(row=0, column=0, sticky="nsew", padx=(0, 16))
+
+        tk.Label(textcol, text="SPOKEN REPORT", bg=CARD, fg=MUTED,
+                 font=(FONT, 10, "bold")).pack(anchor="w")
+        self.transcript_box = self._make_text(textcol, height=5, font=(FONT, 13))
+        self.transcript_box.pack(fill=tk.X, pady=(6, 14))
+
+        tk.Label(textcol, text="IMAGE DESCRIPTION", bg=CARD, fg=MUTED,
+                 font=(FONT, 10, "bold")).pack(anchor="w")
+        self.description_box = self._make_text(textcol, height=10, font=(MONO, 11))
+        self.description_box.pack(fill=tk.BOTH, expand=True, pady=(6, 0))
+
+        imgcol = tk.Frame(content, bg=CARD)
+        imgcol.grid(row=0, column=1, sticky="nsew")
+        tk.Label(imgcol, text="PHOTO", bg=CARD, fg=MUTED,
+                 font=(FONT, 10, "bold")).pack(anchor="w")
+        self.image_label = tk.Label(imgcol, bg=FIELD_BG, fg=MUTED, bd=0,
+                                    highlightbackground=BORDER, highlightthickness=1,
+                                    width=34, height=18, wraplength=240,
+                                    font=(FONT, 11))
+        self.image_label.pack(fill=tk.BOTH, expand=True, pady=(6, 0))
+
+        # Status bar
+        self.status = tk.Label(self.root, text="Waiting for the phone to send a report…",
+                               bg=BG, fg=MUTED, font=(FONT, 11), anchor="w")
+        self.status.pack(side=tk.BOTTOM, fill=tk.X, padx=18, pady=(0, 12))
+
+    def _make_text(self, parent, height, font):
+        return scrolledtext.ScrolledText(
+            parent, wrap=tk.WORD, height=height, font=font,
+            bg=FIELD_BG, fg=TEXT, bd=0, relief=tk.FLAT,
+            highlightbackground=BORDER, highlightthickness=1,
+            padx=12, pady=10, insertbackground=TEXT,
         )
-        self.transcript_box.pack(side=tk.TOP, fill=tk.X, pady=(4, 8))
 
-        ttk.Label(right, text="Image description (GPT-5)").pack(side=tk.TOP, anchor="w")
-        self.description_box = scrolledtext.ScrolledText(
-            right, wrap=tk.WORD, font=("Helvetica", 13), height=8
-        )
-        self.description_box.pack(side=tk.TOP, fill=tk.BOTH, expand=True, pady=(4, 8))
-
-        # Image preview (only populated when Pillow is available and a photo exists)
-        self.image_label = ttk.Label(right)
-        self.image_label.pack(side=tk.TOP, anchor="w")
-
-        self.status = ttk.Label(root, text="Waiting for the phone to send a clip\u2026")
-        self.status.pack(side=tk.BOTTOM, fill=tk.X, padx=12, pady=(0, 10))
-
-        self.refresh()
-
+    # ---- data / actions ---------------------------------------------------
     def refresh(self):
-        """Poll shared state and update the listbox when new clips arrive."""
+        """Poll shared state and update the listbox when new reports arrive."""
         with records_lock:
             count = len(records)
-            items = [f"{r['time']}  ·  {r.get('mode', 'speech')}" for r in records]
+            items = [self._list_label(r) for r in records]
 
         if count != self.shown_count:
             self.listbox.delete(0, tk.END)
             for label in items:
                 self.listbox.insert(tk.END, label)
             self.shown_count = count
-            # Auto-select the newest clip and show its transcript.
+            self.count_label.config(text=str(count))
+            # Auto-select the newest report.
             newest = count - 1
             self.listbox.selection_clear(0, tk.END)
             self.listbox.selection_set(newest)
             self.listbox.see(newest)
             self.display(newest)
-            self.status.config(text=f"{count} clip(s) received")
+            self.status.config(text=f"{count} report(s) received")
 
         self.root.after(800, self.refresh)
+
+    @staticmethod
+    def _list_label(rec):
+        mode = rec.get("mode", "speech")
+        icon = "🖼" if "image" in mode else "🎤"
+        t = rec.get("time", "")
+        clock = t.split(" ")[1] if " " in t else t
+        return f"  {icon}  {clock}"
 
     def on_select(self, _event):
         sel = self.listbox.curselection()
@@ -276,18 +397,26 @@ class ReceiverGui:
         self.thumb_img = None
 
         if not rec:
-            self.mode_label.config(text="Mode: -")
+            self.mode_badge.config(text="—", bg=PRIMARY_TINT, fg=PRIMARY_DK)
+            self.open_img_btn.pack_forget()
             return
 
         mode = rec.get("mode", "speech")
-        self.mode_label.config(text=f"Mode: {mode}")
+        if "image" in mode:
+            self.mode_badge.config(text="  SPEECH + IMAGE  ", bg=ACCENT, fg="white")
+        else:
+            self.mode_badge.config(text="  SPEECH  ", bg=PRIMARY, fg="white")
 
         self.transcript_box.insert(tk.END, rec.get("transcript") or "(no transcript)")
 
         has_image = bool(rec.get("image")) and os.path.exists(rec.get("image"))
         if not has_image:
+            # Speech-only: hide the image-related controls/preview.
+            self.open_img_btn.pack_forget()
             self.description_box.insert(tk.END, "(speech only — no image)")
+            self.image_label.config(text="No photo for this report")
         else:
+            self.open_img_btn.pack(side=tk.LEFT, padx=(8, 0))
             self.description_box.insert(
                 tk.END, rec.get("description") or "(no description)"
             )
@@ -298,12 +427,15 @@ class ReceiverGui:
         use the Open image button."""
         if not HAVE_PIL:
             self.image_label.config(
-                text="(install Pillow to preview images here — or use 'Open image')"
+                text="Install Pillow to preview images here,\nor use 'Open image'."
             )
             return
         try:
             img = Image.open(image_path)
-            img.thumbnail((360, 360))
+            # Honor the photo's EXIF orientation (otherwise it can appear
+            # rotated/flipped since PIL doesn't apply it automatically).
+            img = ImageOps.exif_transpose(img)
+            img.thumbnail((260, 320))
             self.thumb_img = ImageTk.PhotoImage(img)
             self.image_label.config(image=self.thumb_img, text="")
         except Exception:
@@ -314,7 +446,7 @@ class ReceiverGui:
         with records_lock:
             rec = records[idx] if (idx is not None and 0 <= idx < len(records)) else None
         if not rec or not rec.get("image") or not os.path.exists(rec.get("image")):
-            self.status.config(text="No image for this clip")
+            self.status.config(text="No image for this report")
             return
         path = rec["image"]
         system = platform.system()
@@ -334,7 +466,7 @@ class ReceiverGui:
         with records_lock:
             rec = records[idx] if (idx is not None and 0 <= idx < len(records)) else None
         if not rec or not rec["audio"] or not os.path.exists(rec["audio"]):
-            self.status.config(text="No audio file for this clip")
+            self.status.config(text="No audio file for this report")
             return
 
         self.stop_audio()
