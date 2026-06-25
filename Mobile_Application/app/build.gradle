@@ -19,7 +19,19 @@ if (configFile.exists()) {
     configFile.withInputStream { configProps.load(it) }
 }
 def transcriptionModel = configProps.getProperty("TRANSCRIPTION_MODEL", "gpt-4o-mini-transcribe")
+def transcriptionPrompt = configProps.getProperty("TRANSCRIPTION_PROMPT", "")
 def visionModel = configProps.getProperty("VISION_MODEL", "gpt-5")
+def visionSystemPrompt = configProps.getProperty("VISION_SYSTEM_PROMPT", "")
+def visionUserPrompt = configProps.getProperty("VISION_USER_PROMPT", "")
+
+// Quote + escape an arbitrary string into a valid Java string literal.
+def toJavaString = { String s ->
+    '"' + (s == null ? "" : s)
+            .replace('\\', '\\\\')
+            .replace('"', '\\"')
+            .replace('\r', '')
+            .replace('\n', '\\n') + '"'
+}
 
 android {
     namespace 'com.example.slam_hri_mobile_application'
@@ -37,7 +49,10 @@ android {
         buildConfigField "String", "OPENAI_API_KEY", "\"${openAiKey}\""
         buildConfigField "String", "SERVER_URL", "\"${serverUrl}\""
         buildConfigField "String", "TRANSCRIPTION_MODEL", "\"${transcriptionModel}\""
+        buildConfigField "String", "TRANSCRIPTION_PROMPT", toJavaString(transcriptionPrompt)
         buildConfigField "String", "VISION_MODEL", "\"${visionModel}\""
+        buildConfigField "String", "VISION_SYSTEM_PROMPT", toJavaString(visionSystemPrompt)
+        buildConfigField "String", "VISION_USER_PROMPT", toJavaString(visionUserPrompt)
     }
 
     buildFeatures {

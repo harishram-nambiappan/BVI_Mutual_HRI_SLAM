@@ -39,9 +39,10 @@ public class OpenAiVision {
     private static final String ENDPOINT = "https://api.openai.com/v1/chat/completions";
     private static final String DEFAULT_MODEL = "gpt-5";
 
+    // Defaults used if the prompts are not set in config.properties.
     // Context: a person walks an indoor public space holding the phone, reporting
     // OBSTACLES so robots can navigate. Keep the answer short and structured.
-    private static final String SYSTEM_PROMPT =
+    private static final String DEFAULT_SYSTEM_PROMPT =
             "You analyze one photo taken by a person walking through an indoor public "
             + "space (such as an airport) who is reporting OBSTACLES so robots can "
             + "navigate. Identify the single most relevant obstacle/object in front of "
@@ -51,8 +52,18 @@ public class OpenAiVision {
             + "it is doing, or \"stationary\"), \"surface\" (what it rests on or the floor "
             + "type), \"summary\" (one short sentence). Keep every value short and concrete.";
 
-    private static final String USER_PROMPT =
+    private static final String DEFAULT_USER_PROMPT =
             "Identify the main obstacle in this image as JSON.";
+
+    private static String systemPrompt() {
+        String p = BuildConfig.VISION_SYSTEM_PROMPT;
+        return (p == null || p.trim().isEmpty()) ? DEFAULT_SYSTEM_PROMPT : p;
+    }
+
+    private static String userPrompt() {
+        String p = BuildConfig.VISION_USER_PROMPT;
+        return (p == null || p.trim().isEmpty()) ? DEFAULT_USER_PROMPT : p;
+    }
 
     private static final OkHttpClient client = new OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
@@ -82,10 +93,10 @@ public class OpenAiVision {
 
             JSONObject systemMsg = new JSONObject()
                     .put("role", "system")
-                    .put("content", SYSTEM_PROMPT);
+                    .put("content", systemPrompt());
 
             JSONArray userContent = new JSONArray()
-                    .put(new JSONObject().put("type", "text").put("text", USER_PROMPT))
+                    .put(new JSONObject().put("type", "text").put("text", userPrompt()))
                     .put(new JSONObject()
                             .put("type", "image_url")
                             .put("image_url", new JSONObject().put("url", dataUrl)));

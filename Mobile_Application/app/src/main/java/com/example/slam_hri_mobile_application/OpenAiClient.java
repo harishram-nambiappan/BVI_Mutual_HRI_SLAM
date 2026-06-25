@@ -61,12 +61,18 @@ public class OpenAiClient {
 
         RequestBody fileBody = RequestBody.create(MediaType.parse("audio/mp4"), audioFile);
 
-        MultipartBody body = new MultipartBody.Builder()
+        MultipartBody.Builder builder = new MultipartBody.Builder()
                 .setType(MultipartBody.FORM)
                 .addFormDataPart("file", audioFile.getName(), fileBody)
                 .addFormDataPart("model", model())
-                .addFormDataPart("response_format", "json")
-                .build();
+                .addFormDataPart("response_format", "json");
+
+        String prompt = BuildConfig.TRANSCRIPTION_PROMPT;
+        if (prompt != null && !prompt.trim().isEmpty()) {
+            builder.addFormDataPart("prompt", prompt);
+        }
+
+        MultipartBody body = builder.build();
 
         Request request = new Request.Builder()
                 .url(ENDPOINT)
