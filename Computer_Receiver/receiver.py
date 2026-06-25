@@ -34,7 +34,9 @@ from tkinter import ttk, scrolledtext
 # Pillow is optional: if present we show inline image previews; if not, the GUI
 # still works and offers an "Open image" button instead.
 try:
-    from PIL import Image, ImageTk
+    from PIL import Image, ImageTk, ImageOps, ImageFile
+    # Be lenient with images that were uploaded slightly incomplete.
+    ImageFile.LOAD_TRUNCATED_IMAGES = True
     HAVE_PIL = True
 except Exception:
     HAVE_PIL = False
@@ -432,14 +434,18 @@ class ReceiverGui:
             return
         try:
             img = Image.open(image_path)
+            img.load()
             # Honor the photo's EXIF orientation (otherwise it can appear
             # rotated/flipped since PIL doesn't apply it automatically).
             img = ImageOps.exif_transpose(img)
+            if img.mode not in ("RGB", "RGBA"):
+                img = img.convert("RGB")
             img.thumbnail((260, 320))
             self.thumb_img = ImageTk.PhotoImage(img)
             self.image_label.config(image=self.thumb_img, text="")
-        except Exception:
-            self.image_label.config(text="(could not preview image)")
+        except Exception as e:
+            print(f"[preview error] {image_path}: {e}")
+            self.image_label.config(text=f"Could not preview image:\n{e}")
 
     def open_image(self):
         idx = self.selected_index
